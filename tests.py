@@ -4,6 +4,32 @@ from automatic_differentiation import Variable
 
 
 class TestVariable(unittest.TestCase):
+
+    def test_variable_name(self):
+        x = Variable('x')
+        self.assertEqual(x.name, 'x')
+
+        y = Variable('y')
+        self.assertEqual(y.name, 'y')
+
+        z = Variable('z')
+        self.assertEqual(z.name, 'z')
+
+    def test_variable_repr_str(self):
+        x = Variable('x')
+        self.assertEqual(repr(x), 'x')
+        self.assertEqual(str(x), 'x')
+
+    def test_variable_evaluate(self):
+        x = Variable('x')
+        self.assertEqual(x.evaluate({x: 5}), 5)
+
+    def test_variable_compute_gradients(self):
+        x = Variable('x')
+        x.value = 5
+        grads = x.compute_gradients()
+        self.assertEqual(grads[x], 1.0)
+
     def test_addition(self):
         x = Variable('x')
         y = Variable('y')
@@ -79,6 +105,61 @@ class TestVariable(unittest.TestCase):
         self.assertEqual(evaluation_result, -5)
 
         self.assertEqual(formula.grads[x], -1.0)
+
+    def test_raddition(self):
+        x = Variable('x')
+
+        formula = 2 + x
+        self.assertEqual(str(formula), "(x + 2)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, 7)
+
+        self.assertEqual(formula.grads[x], 1.0)
+
+    def test_rsubtraction(self):
+        x = Variable('x')
+
+        formula = 2 - x
+        self.assertEqual(str(formula), "((-x) + 2)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, -3)
+
+        self.assertEqual(formula.grads[x], -1.0)
+
+    def test_rmultiplication(self):
+        x = Variable('x')
+
+        formula = 2 * x
+        self.assertEqual(str(formula), "x * 2")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, 10)
+
+        self.assertEqual(formula.grads[x], 2.0)
+
+    def test_rdivision(self):
+        x = Variable('x')
+
+        formula = 2 / x
+        self.assertEqual(str(formula), "2 / x")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, 2 / 5)
+
+        self.assertEqual(formula.grads[x], -0.08)
+
+    def test_rpower(self):
+        x = Variable('x')
+
+        formula = 2 ** x
+        self.assertEqual(str(formula), "2 ** x")
+
+        evaluation_result = formula.evaluate({x: 3})
+        self.assertEqual(evaluation_result, 8)
+
+        self.assertEqual(formula.grads[x], 8 * math.log(2))
 
     def test_composition(self):
         x = Variable('x')
