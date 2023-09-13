@@ -1,25 +1,25 @@
-# Automatic Differentiation with Variable Class
+# Automatic Differentiation
 
 This Python project provides a simple implementation of automatic differentiation using the `Variable` class. Automatic differentiation (AD) is a technique widely used in machine learning and scientific computing to compute gradients of mathematical functions efficiently. This project aims to demonstrate AD principles in a clear and concise manner.
 
 ## Features
 
 - Supports basic arithmetic operations (addition, negation, subtraction, multiplication, division and exponentiation).
-- Computes gradients of composite functions.
-- Implements reverse-mode automatic differentiation (backpropagation).
+- Supports mathematical functions like `sin`, `cos`, `tan`, `exp` and `sqrt`.
+- Builds a computational graphs of calculations and computes evaluation and gradients of composite functions on demand.
 
 ## Example
 
 Here's a simple example of how you can use this project:
 
 ```python
-from automatic_differentiation import Variable
+from automatic_differentiation import Variable, exp
     
 x = Variable('x')
 y = Variable('y')
 z = Variable('z')
 
-formula = (x + y) * (x - y) / (x ** z)
+formula = exp((x + y) * (x - y) / (x ** z))
 print(f"f(x, y, z) = {formula}")                               # Displays the formula
 
 evaluation = formula.evaluate({x: 2, y: 3, z: 4})

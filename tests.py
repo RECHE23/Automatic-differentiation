@@ -1,6 +1,6 @@
 import unittest
 import math
-from automatic_differentiation import Variable
+from automatic_differentiation import Variable, sin, cos, tan, exp, sqrt
 
 
 class TestVariable(unittest.TestCase):
@@ -161,6 +161,61 @@ class TestVariable(unittest.TestCase):
 
         self.assertEqual(formula.grads[x], 8 * math.log(2))
 
+    def test_exp(self):
+        x = Variable('x')
+
+        formula = exp(x)
+        self.assertEqual(str(formula), "exp(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.exp(5))
+
+        self.assertEqual(formula.grads[x], math.exp(5))
+
+    def test_sin(self):
+        x = Variable('x')
+
+        formula = sin(x)
+        self.assertEqual(str(formula), "sin(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.sin(5))
+
+        self.assertEqual(formula.grads[x], math.cos(5))
+
+    def test_cos(self):
+        x = Variable('x')
+
+        formula = cos(x)
+        self.assertEqual(str(formula), "cos(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.cos(5))
+
+        self.assertEqual(formula.grads[x], -math.sin(5))
+
+    def test_tan(self):
+        x = Variable('x')
+
+        formula = tan(x)
+        self.assertEqual(str(formula), "tan(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.tan(5))
+
+        self.assertEqual(formula.grads[x], 1/math.cos(5)**2)
+
+    def test_sqrt(self):
+        x = Variable('x')
+
+        formula = sqrt(x)
+        self.assertEqual(str(formula), "sqrt(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.sqrt(5))
+
+        self.assertEqual(formula.grads[x], 0.5/math.sqrt(5))
+
     def test_composition1(self):
         x = Variable('x')
         y = Variable('y')
@@ -218,6 +273,80 @@ class TestVariable(unittest.TestCase):
 
         self.assertAlmostEqual(formula.grads[x], 784/3, places=12)
         self.assertAlmostEqual(formula.grads[y], 196/27, places=12)
+
+    def test_composition5(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = ((sin(x) + 1) - 1 / tan(y)) ** 3
+        self.assertEqual(str(formula), "(((sin(x) + 1) - 1 / tan(y))) ** 3")
+
+        evaluation_result = formula.evaluate({x: 2, y: 3})
+        self.assertAlmostEqual(evaluation_result, 710.81891825853180, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], -99.43528074078256, places=12)
+        self.assertAlmostEqual(formula.grads[y], 11998.217252828359, places=12)
+
+    def test_composition6(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = sin(x) / cos(y)
+        self.assertEqual(str(formula), "sin(x) / cos(y)")
+
+        evaluation_result = formula.evaluate({x: 7, y: 13})
+        self.assertAlmostEqual(evaluation_result, 0.723994632135732319226, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 0.8307950061142856, places=12)
+        self.assertAlmostEqual(formula.grads[y], 0.3352248148114238, places=12)
+
+    def test_composition7(self):
+        x = Variable('x')
+
+        formula = tan(cos(sin(x)))
+        self.assertEqual(str(formula), "tan(cos(sin(x)))")
+
+        evaluation_result = formula.evaluate({x: 7})
+        self.assertAlmostEqual(evaluation_result, 1.0129597054626613972468, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], -0.9328782306346769, places=12)
+
+    def test_composition8(self):
+        x = Variable('x')
+
+        formula = exp(tan(cos(sin(x))))
+        self.assertEqual(str(formula), "exp(tan(cos(sin(x))))")
+
+        evaluation_result = formula.evaluate({x: 7})
+        self.assertAlmostEqual(evaluation_result, 2.7537392227474955665619, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], -2.5689033737459943, places=12)
+
+    def test_composition9(self):
+        x = Variable('x')
+
+        formula = sqrt(exp(tan(cos(sin(x)))))
+        self.assertEqual(str(formula), "sqrt(exp(tan(cos(sin(x)))))")
+
+        evaluation_result = formula.evaluate({x: 7})
+        self.assertAlmostEqual(evaluation_result, 1.6594394302738185709155, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], -0.7740274597796282, places=12)
+
+    def test_composition10(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+
+        formula = sqrt(1 / ((x ** 2 + y ** 2) + z ** 2))
+        self.assertEqual(str(formula), "sqrt(1 / (((x ** 2 + y ** 2) + z ** 2)))")
+
+        evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+        self.assertAlmostEqual(evaluation_result, 0.1856953381770518631, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], -0.01280657504669323, places=12)
+        self.assertAlmostEqual(formula.grads[y], -0.01920986257003984, places=12)
+        self.assertAlmostEqual(formula.grads[z], -0.02561315009338646, places=12)
 
 
 if __name__ == '__main__':

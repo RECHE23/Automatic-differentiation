@@ -256,6 +256,51 @@ class Variable:
         exponent = f"({self.name})" if len(self.variables) > 1 else self.name
         return Variable(name=f"{base} ** {exponent}", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
+    def exp(self):
+        def value_fn():
+            return math.exp(self.value_fn())
+
+        def gradient_fn():
+            return ((self, math.exp(self.value_fn())), )
+
+        return Variable(name=f"exp({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def sin(self):
+        def value_fn():
+            return math.sin(self.value_fn())
+
+        def gradient_fn():
+            return ((self, math.cos(self.value_fn())), )
+
+        return Variable(name=f"sin({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def cos(self):
+        def value_fn():
+            return math.cos(self.value_fn())
+
+        def gradient_fn():
+            return ((self, -math.sin(self.value_fn())), )
+
+        return Variable(name=f"cos({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def tan(self):
+        def value_fn():
+            return math.tan(self.value_fn())
+
+        def gradient_fn():
+            return ((self, 1/math.cos(self.value_fn())**2), )
+
+        return Variable(name=f"tan({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def sqrt(self):
+        def value_fn():
+            return math.sqrt(self.value_fn())
+
+        def gradient_fn():
+            return ((self, 0.5 / math.sqrt(self.value_fn())), )
+
+        return Variable(name=f"sqrt({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
     def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
         """
         Evaluate the variable with given variable assignments.
@@ -301,13 +346,33 @@ class Variable:
         )
 
 
+def exp(variable):
+    return variable.exp() if isinstance(variable, Variable) else math.exp(variable)
+
+
+def sin(variable):
+    return variable.sin() if isinstance(variable, Variable) else math.sin(variable)
+
+
+def cos(variable):
+    return variable.cos() if isinstance(variable, Variable) else math.cos(variable)
+
+
+def tan(variable):
+    return variable.tan() if isinstance(variable, Variable) else math.tan(variable)
+
+
+def sqrt(variable):
+    return variable.sqrt() if isinstance(variable, Variable) else math.sqrt(variable)
+
+
 # Example usage
 if __name__ == "__main__":
     x = Variable('x')
     y = Variable('y')
     z = Variable('z')
 
-    formula = (x + y) * (x - y) / (x ** z)
+    formula = exp((x + y) * (x - y) / (x ** z))
     print(f"f(x, y, z) = {formula}")                               # Displays the formula
 
     evaluation = formula.evaluate({x: 2, y: 3, z: 4})
