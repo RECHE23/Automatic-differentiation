@@ -15,17 +15,19 @@ Here's a simple example of how you can use this project:
 ```python
 from automatic_differentiation import Variable
     
-x = Variable(2)
-y = Variable(3)
-z = Variable(4)
+x = Variable('x')
+y = Variable('y')
+z = Variable('z')
 
-result = (x + y) * (x - y) / (x ** z)
-print(result.value)  # Evaluation of the expression
+formula = (x + y) * (x - y) / (x ** z)
+print(f"f(x, y, z) = {formula}")                                       # Displays the formula
 
-gradients = result.compute_gradients(x, y, z)
-print(gradients[x])  # Gradient with respect to x
-print(gradients[y])  # Gradient with respect to y
-print(gradients[z])  # Gradient with respect to z
+evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+print(f"f({x.value}, {y.value}, {z.value}) = {evaluation_result}")     # Evaluation of the expression
+
+print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {formula.grads[x]}")  # Gradient with respect to x
+print(f"∂f({x.value}, {y.value}, {z.value})/∂y = {formula.grads[y]}")  # Gradient with respect to y
+print(f"∂f({x.value}, {y.value}, {z.value})/∂z = {formula.grads[z]}")  # Gradient with respect to z
 ```
 
 ## Contributing

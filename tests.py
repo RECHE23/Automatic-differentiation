@@ -5,92 +5,108 @@ from automatic_differentiation import Variable
 
 class TestVariable(unittest.TestCase):
     def test_addition(self):
-        x = Variable(5)
-        y = Variable(3)
+        x = Variable('x')
+        y = Variable('y')
 
-        result = x + y
-        self.assertEqual(result.value, 8)
+        formula = x + y
+        self.assertEqual(str(formula), "(x + y)")
 
-        gradients = result.compute_gradients(x, y)
-        self.assertEqual(gradients[x], 1.0)
-        self.assertEqual(gradients[y], 1.0)
+        evaluation_result = formula.evaluate({x: 5, y: 3})
+        self.assertEqual(evaluation_result, 8)
+
+        self.assertEqual(formula.grads[x], 1.0)
+        self.assertEqual(formula.grads[y], 1.0)
 
     def test_subtraction(self):
-        x = Variable(5)
-        y = Variable(3)
+        x = Variable('x')
+        y = Variable('y')
 
-        result = x - y
-        self.assertEqual(result.value, 2)
+        formula = x - y
+        self.assertEqual(str(formula), "(x - y)")
 
-        gradients = result.compute_gradients(x, y)
-        self.assertEqual(gradients[x], 1.0)
-        self.assertEqual(gradients[y], -1.0)
+        evaluation_result = formula.evaluate({x: 5, y: 3})
+        self.assertEqual(evaluation_result, 2)
+
+        self.assertEqual(formula.grads[x], 1.0)
+        self.assertEqual(formula.grads[y], -1.0)
 
     def test_multiplication(self):
-        x = Variable(5)
-        y = Variable(3)
+        x = Variable('x')
+        y = Variable('y')
 
-        result = x * y
-        self.assertEqual(result.value, 15)
+        formula = x * y
+        self.assertEqual(str(formula), "x * y")
 
-        gradients = result.compute_gradients(x, y)
-        self.assertEqual(gradients[x], 3.0)
-        self.assertEqual(gradients[y], 5.0)
+        evaluation_result = formula.evaluate({x: 5, y: 3})
+        self.assertEqual(evaluation_result, 15)
+
+        self.assertEqual(formula.grads[x], 3.0)
+        self.assertEqual(formula.grads[y], 5.0)
 
     def test_division(self):
-        x = Variable(10)
-        y = Variable(2)
+        x = Variable('x')
+        y = Variable('y')
 
-        result = x / y
-        self.assertEqual(result.value, 5)
+        formula = x / y
+        self.assertEqual(str(formula), "x / y")
 
-        gradients = result.compute_gradients(x, y)
-        self.assertEqual(gradients[x], 0.5)
-        self.assertEqual(gradients[y], -2.5)
+        evaluation_result = formula.evaluate({x: 10, y: 2})
+        self.assertEqual(evaluation_result, 5)
+
+        self.assertEqual(formula.grads[x], 0.5)
+        self.assertEqual(formula.grads[y], -2.5)
 
     def test_power(self):
-        x = Variable(2)
-        y = Variable(3)
+        x = Variable('x')
+        y = Variable('y')
 
-        result = x ** y
-        self.assertEqual(result.value, 8)
+        formula = x ** y
+        self.assertEqual(str(formula), "x ** y")
 
-        gradients = result.compute_gradients(x, y)
-        self.assertEqual(gradients[x], 12.0)
-        self.assertEqual(gradients[y], 8.0 * math.log(2))
+        evaluation_result = formula.evaluate({x: 2, y: 3})
+        self.assertEqual(evaluation_result, 8)
+
+        self.assertEqual(formula.grads[x], 12.0)
+        self.assertEqual(formula.grads[y], 8.0 * math.log(2))
 
     def test_negative(self):
-        x = Variable(5)
+        x = Variable('x')
 
-        result = -x
-        self.assertEqual(result.value, -5)
+        formula = -x
+        self.assertEqual(str(formula), "(-x)")
 
-        gradients = result.compute_gradients(x)
-        self.assertEqual(gradients[x], -1.0)
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, -5)
+
+        self.assertEqual(formula.grads[x], -1.0)
 
     def test_composition(self):
-        x = Variable(2)
-        y = Variable(3)
-        z = Variable(4)
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
 
-        result = (x + y) * (x - y) / (x ** z)
-        self.assertEqual(result.value, -5 / 16)
+        formula = (x + y) * (x - y) / x ** z
+        self.assertEqual(str(formula), "(x + y) * (x - y) / x ** z")
 
-        gradients = result.compute_gradients(x, y, z)
-        self.assertEqual(gradients[x], 0.875)
-        self.assertEqual(gradients[y], -0.375)
-        self.assertEqual(gradients[z], 5 / 16 * math.log(2))
+        evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+        self.assertEqual(evaluation_result, -5 / 16)
+
+        self.assertEqual(formula.grads[x], 0.875)
+        self.assertEqual(formula.grads[y], -0.375)
+        self.assertEqual(formula.grads[z], 5 / 16 * math.log(2))
 
     def test_advanced_composition(self):
-        x = Variable(2)
-        y = Variable(3)
+        x = Variable('x')
+        y = Variable('y')
 
-        result = (x**2 + 1 - 1 / y)**3
-        self.assertAlmostEqual(result.value, 2744/27, places=12)
+        formula = ((x ** 2 + 1) - 1 / y) ** 3
+        self.assertEqual(str(formula), "((x ** 2 + 1) - 1 / y) ** 3")
 
-        gradients = result.compute_gradients(x, y)
-        self.assertAlmostEqual(gradients[x], 784/3, places=12)
-        self.assertAlmostEqual(gradients[y], 196/27, places=12)
+        evaluation_result = formula.evaluate({x: 2, y: 3})
+        self.assertAlmostEqual(evaluation_result, 2744/27, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 784/3, places=12)
+        self.assertAlmostEqual(formula.grads[y], 196/27, places=12)
 
 
 if __name__ == '__main__':
