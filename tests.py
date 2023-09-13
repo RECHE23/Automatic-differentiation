@@ -161,13 +161,13 @@ class TestVariable(unittest.TestCase):
 
         self.assertEqual(formula.grads[x], 8 * math.log(2))
 
-    def test_composition(self):
+    def test_composition1(self):
         x = Variable('x')
         y = Variable('y')
         z = Variable('z')
 
         formula = (x + y) * (x - y) / x ** z
-        self.assertEqual(str(formula), "(x + y) * (x - y) / x ** z")
+        self.assertEqual(str(formula), "((x + y) * (x - y)) / (x ** z)")
 
         evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
         self.assertEqual(evaluation_result, -5 / 16)
@@ -176,12 +176,42 @@ class TestVariable(unittest.TestCase):
         self.assertEqual(formula.grads[y], -0.375)
         self.assertEqual(formula.grads[z], 5 / 16 * math.log(2))
 
-    def test_advanced_composition(self):
+    def test_composition2(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+
+        formula = x / (y * z)
+        self.assertEqual(str(formula), "x / (y * z)")
+
+        evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+        self.assertEqual(evaluation_result, 1/6)
+
+        self.assertEqual(formula.grads[x], 1/12)
+        self.assertEqual(formula.grads[y], -1/18)
+        self.assertEqual(formula.grads[z], -1/24)
+
+    def test_composition3(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+
+        formula = x ** ((y * z) ** 0.5)
+        self.assertEqual(str(formula), "x ** ((y * z) ** 0.5)")
+
+        evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+        self.assertEqual(evaluation_result, 4**(math.sqrt(3)))
+
+        self.assertAlmostEqual(formula.grads[x], math.sqrt(3) * 4**(math.sqrt(3)), places=12)
+        self.assertAlmostEqual(formula.grads[y], 4**(math.sqrt(3)) * math.log(2) / math.sqrt(3), places=12)
+        self.assertAlmostEqual(formula.grads[z], math.sqrt(3) * 4**(math.sqrt(3) - 1) * math.log(2), places=12)
+
+    def test_composition4(self):
         x = Variable('x')
         y = Variable('y')
 
         formula = ((x ** 2 + 1) - 1 / y) ** 3
-        self.assertEqual(str(formula), "((x ** 2 + 1) - 1 / y) ** 3")
+        self.assertEqual(str(formula), "(((x ** 2 + 1) - 1 / y)) ** 3")
 
         evaluation_result = formula.evaluate({x: 2, y: 3})
         self.assertAlmostEqual(evaluation_result, 2744/27, places=12)
