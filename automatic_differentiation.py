@@ -267,14 +267,14 @@ class Variable:
 
         return self.value_fn()
 
-    def compute_gradients(self, variables: Dict[Variable, float] = None, backpropagation: float = 1.0) -> Dict[Variable, float]:
+    def compute_gradients(self, variable_assignments: Dict[Variable, SupportsFloat] = None, backpropagation: float = 1.0) -> Dict[Variable, float]:
         """
         Compute gradients of the variable.
 
         Parameters:
         ----------
-        variables : Variable, optional
-            Variables with respect to which gradients are calculated.
+        variable_assignments : Dict[Variable, SupportsFloat], optional
+            A dictionary containing variable assignments.
         backpropagation : float, optional
             The value to backpropagate for computing gradients.
 
@@ -283,12 +283,12 @@ class Variable:
         Dict[Variable, float]
             A dictionary containing gradients with respect to specified variables.
         """
-        if variables is not None:
-            self.evaluate(variables)
+        if variable_assignments is not None:
+            self.evaluate(variable_assignments)
 
         return reduce(
             lambda a, b: {k: a.get(k, 0) + b.get(k, 0) for k in set(a) | set(b)},
-            [var.compute_gradients(variables, backpropagation=val * backpropagation) for var, val in self.gradient_fn()],
+            [var.compute_gradients(variable_assignments, backpropagation=val * backpropagation) for var, val in self.gradient_fn()],
             {self: backpropagation}
         )
 
