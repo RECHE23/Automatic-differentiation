@@ -300,11 +300,12 @@ if __name__ == "__main__":
     z = Variable('z')
 
     formula = (x + y) * (x - y) / (x ** z)
-    print(f"f(x, y, z) = {formula}")                                       # Displays the formula
+    print(f"f(x, y, z) = {formula}")                               # Displays the formula
 
-    evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
-    print(f"f({x.value}, {y.value}, {z.value}) = {evaluation_result}")     # Evaluation of the expression
+    evaluation = formula.evaluate({x: 2, y: 3, z: 4})
+    print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")    # Evaluation of the expression
 
-    print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {formula.grads[x]}")  # Gradient with respect to x
-    print(f"∂f({x.value}, {y.value}, {z.value})/∂y = {formula.grads[y]}")  # Gradient with respect to y
-    print(f"∂f({x.value}, {y.value}, {z.value})/∂z = {formula.grads[z]}")  # Gradient with respect to z
+    grads = formula.grads
+    print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {grads[x]}")  # Gradient with respect to x
+    print(f"∂f({x.value}, {y.value}, {z.value})/∂y = {grads[y]}")  # Gradient with respect to y
+    print(f"∂f({x.value}, {y.value}, {z.value})/∂z = {grads[z]}")  # Gradient with respect to z
