@@ -1,6 +1,6 @@
 import unittest
 import math
-from automatic_differentiation import Variable, sin, cos, tan, exp, sqrt, cbrt
+from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, exp, log, log10, sqrt, cbrt
 
 
 class TestVariable(unittest.TestCase):
@@ -183,6 +183,28 @@ class TestVariable(unittest.TestCase):
 
         self.assertEqual(formula.grads[x], math.exp(5))
 
+    def test_log(self):
+        x = Variable('x')
+
+        formula = log(x)
+        self.assertEqual(str(formula), "log(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertAlmostEqual(evaluation_result, math.log(5), places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 1 / 5, places=12)
+
+    def test_log10(self):
+        x = Variable('x')
+
+        formula = log10(x)
+        self.assertEqual(str(formula), "log10(x)")
+
+        evaluation_result = formula.evaluate({x: 100})
+        self.assertAlmostEqual(evaluation_result, 2.0, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 0.004342944819032518, places=12)
+
     def test_sin(self):
         x = Variable('x')
 
@@ -215,6 +237,39 @@ class TestVariable(unittest.TestCase):
         self.assertEqual(evaluation_result, math.tan(5))
 
         self.assertEqual(formula.grads[x], 1/math.cos(5)**2)
+
+    def test_sinh(self):
+        x = Variable('x')
+
+        formula = sinh(x)
+        self.assertEqual(str(formula), "sinh(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.sinh(5))
+
+        self.assertEqual(formula.grads[x], math.cosh(5))
+
+    def test_cosh(self):
+        x = Variable('x')
+
+        formula = cosh(x)
+        self.assertEqual(str(formula), "cosh(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.cosh(5))
+
+        self.assertEqual(formula.grads[x], math.sinh(5))
+
+    def test_tanh(self):
+        x = Variable('x')
+
+        formula = tanh(x)
+        self.assertEqual(str(formula), "tanh(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertEqual(evaluation_result, math.tanh(5))
+
+        self.assertEqual(formula.grads[x], 1/math.cosh(5)**2)
 
     def test_sqrt(self):
         x = Variable('x')

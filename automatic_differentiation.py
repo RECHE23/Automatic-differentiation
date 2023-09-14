@@ -286,6 +286,28 @@ class Variable:
 
         return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
+    def log(self):
+        name = f"log({self.name})"
+
+        def value_fn():
+            return math.log(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / self.value_fn()),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def log10(self):
+        name = f"log10({self.name})"
+
+        def value_fn():
+            return math.log10(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / (self.value_fn() * math.log(10.0))),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
     def sin(self):
         name = f"sin({self.name})"
 
@@ -316,6 +338,39 @@ class Variable:
 
         def gradient_fn():
             return (self, 1 / math.cos(self.value_fn()) ** 2),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def sinh(self):
+        name = f"sinh({self.name})"
+
+        def value_fn():
+            return math.sinh(self.value_fn())
+
+        def gradient_fn():
+            return (self, math.cosh(self.value_fn())),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def cosh(self):
+        name = f"cosh({self.name})"
+
+        def value_fn():
+            return math.cosh(self.value_fn())
+
+        def gradient_fn():
+            return (self, math.sinh(self.value_fn())),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def tanh(self):
+        name = f"tanh({self.name})"
+
+        def value_fn():
+            return math.tanh(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1 / math.cosh(self.value_fn()) ** 2),
 
         return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
@@ -393,6 +448,14 @@ def exp(variable):
     return variable.exp() if isinstance(variable, Variable) else math.exp(variable)
 
 
+def log(variable):
+    return variable.log() if isinstance(variable, Variable) else math.log(variable)
+
+
+def log10(variable):
+    return variable.log10() if isinstance(variable, Variable) else math.log10(variable)
+
+
 def sin(variable):
     return variable.sin() if isinstance(variable, Variable) else math.sin(variable)
 
@@ -403,6 +466,18 @@ def cos(variable):
 
 def tan(variable):
     return variable.tan() if isinstance(variable, Variable) else math.tan(variable)
+
+
+def sinh(variable):
+    return variable.sinh() if isinstance(variable, Variable) else math.sinh(variable)
+
+
+def cosh(variable):
+    return variable.cosh() if isinstance(variable, Variable) else math.cosh(variable)
+
+
+def tanh(variable):
+    return variable.tanh() if isinstance(variable, Variable) else math.tanh(variable)
 
 
 def sqrt(variable):
