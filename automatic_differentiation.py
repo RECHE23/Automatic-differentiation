@@ -3,6 +3,64 @@ from functools import reduce
 from typing import Set, Union, SupportsFloat, Callable, Tuple, Dict
 import math
 
+unary_operations = {
+    'neg': float.__neg__,
+    'abs': float.__abs__,
+    'exp': math.exp,
+    'log': math.log,
+    'log10': math.log10,
+    'sin': math.sin,
+    'asin': math.asin,
+    'cos': math.cos,
+    'acos': math.acos,
+    'tan': math.tan,
+    'atan': math.atan,
+    'sinh': math.sinh,
+    'asinh': math.asinh,
+    'cosh': math.cosh,
+    'acosh': math.acosh,
+    'tanh': math.tanh,
+    'atanh': math.atanh,
+    'sqrt': math.sqrt,
+    'cbrt': lambda v: v ** (1 / 3),
+    'erf': math.erf,
+    'erfc': math.erfc}
+
+binary_operations = {
+    '+': float.__add__,
+    '-': float.__sub__,
+    '*': float.__mul__,
+    '/': float.__truediv__,
+    '**': float.__pow__}
+
+operation_priority = {
+    '**': 0,
+    'neg': 1,
+    'abs': 1,
+    'exp': 1,
+    'log': 1,
+    'log10': 1,
+    'sin': 1,
+    'asin': 1,
+    'cos': 1,
+    'acos': 1,
+    'tan': 1,
+    'atan': 1,
+    'sinh': 1,
+    'asinh': 1,
+    'cosh': 1,
+    'acosh': 1,
+    'tanh': 1,
+    'atanh': 1,
+    'sqrt': 1,
+    'cbrt': 1,
+    'erf': 1,
+    'erfc': 1,
+    '*': 2,
+    '/': 2,
+    '+': 3,
+    '-': 3}
+
 
 class Variable:
     def __init__(self, name: str, value: SupportsFloat = None,
@@ -33,97 +91,97 @@ class Variable:
         return self.compute_gradients()
 
     def __add__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(self, other, "+")
+        return Node.binary_operation(self, other, "+")
 
     def __radd__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(other, self, "+")
+        return Node.binary_operation(other, self, "+")
 
     def __sub__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(self, other, "-")
+        return Node.binary_operation(self, other, "-")
 
     def __rsub__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(other, self, "-")
+        return Node.binary_operation(other, self, "-")
 
     def __mul__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(self, other, "*")
+        return Node.binary_operation(self, other, "*")
 
     def __rmul__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(other, self, "*")
+        return Node.binary_operation(other, self, "*")
 
     def __truediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(self, other, "/")
+        return Node.binary_operation(self, other, "/")
 
     def __rtruediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(other, self, "/")
+        return Node.binary_operation(other, self, "/")
 
     def __pow__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(self, other, "**")
+        return Node.binary_operation(self, other, "**")
 
     def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Node:
-        return self._binary_operation(other, self, "**")
+        return Node.binary_operation(other, self, "**")
 
     def __neg__(self) -> Node:
-        return self._unary_operation(self, "neg")
+        return Node.unary_operation(self, "neg")
 
     def __abs__(self) -> Node:
-        return self._unary_operation(self, "abs")
+        return Node.unary_operation(self, "abs")
 
     def exp(self):
-        return self._unary_operation(self, "exp")
+        return Node.unary_operation(self, "exp")
 
     def log(self):
-        return self._unary_operation(self, "log")
+        return Node.unary_operation(self, "log")
 
     def log10(self):
-        return self._unary_operation(self, "log10")
+        return Node.unary_operation(self, "log10")
 
     def sin(self):
-        return self._unary_operation(self, "sin")
+        return Node.unary_operation(self, "sin")
 
     def cos(self):
-        return self._unary_operation(self, "cos")
+        return Node.unary_operation(self, "cos")
 
     def tan(self):
-        return self._unary_operation(self, "tan")
+        return Node.unary_operation(self, "tan")
 
     def sinh(self):
-        return self._unary_operation(self, "sinh")
+        return Node.unary_operation(self, "sinh")
 
     def cosh(self):
-        return self._unary_operation(self, "cosh")
+        return Node.unary_operation(self, "cosh")
 
     def tanh(self):
-        return self._unary_operation(self, "tanh")
+        return Node.unary_operation(self, "tanh")
 
     def acos(self):
-        return self._unary_operation(self, "acos")
+        return Node.unary_operation(self, "acos")
 
     def acosh(self):
-        return self._unary_operation(self, "acosh")
+        return Node.unary_operation(self, "acosh")
 
     def asin(self):
-        return self._unary_operation(self, "asin")
+        return Node.unary_operation(self, "asin")
 
     def asinh(self):
-        return self._unary_operation(self, "asinh")
+        return Node.unary_operation(self, "asinh")
 
     def atan(self):
-        return self._unary_operation(self, "atan")
+        return Node.unary_operation(self, "atan")
 
     def atanh(self):
-        return self._unary_operation(self, "atanh")
+        return Node.unary_operation(self, "atanh")
 
     def sqrt(self):
-        return self._unary_operation(self, "sqrt")
+        return Node.unary_operation(self, "sqrt")
 
     def cbrt(self):
-        return self._unary_operation(self, "cbrt")
+        return Node.unary_operation(self, "cbrt")
 
     def erf(self):
-        return self._unary_operation(self, "erf")
+        return Node.unary_operation(self, "erf")
 
     def erfc(self):
-        return self._unary_operation(self, "erfc")
+        return Node.unary_operation(self, "erfc")
 
     def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
         self._apply_variable_assignments(variable_assignments)
@@ -148,35 +206,40 @@ class Variable:
     def _ensure_is_variable(other: Union[Variable, SupportsFloat]):
         return Variable(name=str(other), value=float(other)) if not isinstance(other, Variable) else other
 
+
+class Node(Variable):
+    def __init__(self, name: str, variables: Set[Variable] = None, operation: str = None,
+                 value_fn: Callable[[], float] = None, gradient_fn: Callable[[], Tuple[Tuple[Variable, float], ...]] = lambda: []):
+        super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
+        self.variables = {self} if variables is None else variables
+        self.operation = operation
+
     @staticmethod
-    def _unary_operation(item: Union[Variable, SupportsFloat], op: str) -> Node:
+    def _apply_parenthesis_if_needed(item: Variable, op: str, right: bool = False) -> str:
+        if isinstance(item, Node):
+            if op == 'neg' and item.operation in ('+', '-'):
+                # This prevents the conversion of -(x + y) to become -x + y:
+                return f"({item.name})"
+            if right and op == '/' and item.operation in ('+', '-', '*', '/'):
+                # This prevents the conversion of 1 / (x * y) to become 1 / x * y:
+                return f"({item.name})"
+            if operation_priority[item.operation] > operation_priority[op]:
+                # This covers the other cases where priority of operations requires parenthesis:
+                return f"({item.name})"
+        return item.name
+
+    @staticmethod
+    def unary_operation(item: Union[Variable, SupportsFloat], op: str) -> Node:
         item = Variable._ensure_is_variable(item)
         variables = item.variables
-        name = f"{op}({item.name})" if op != 'neg' else f"-{item.name}"
-        functions = {'neg': float.__neg__,
-                     'abs': float.__abs__,
-                     'exp': math.exp,
-                     'log': math.log,
-                     'log10': math.log10,
-                     'sin': math.sin,
-                     'asin': math.asin,
-                     'cos': math.cos,
-                     'acos': math.acos,
-                     'tan': math.tan,
-                     'atan': math.atan,
-                     'sinh': math.sinh,
-                     'asinh': math.asinh,
-                     'cosh': math.cosh,
-                     'acosh': math.acosh,
-                     'tanh': math.tanh,
-                     'atanh': math.atanh,
-                     'sqrt': math.sqrt,
-                     'cbrt': lambda v: v ** (1 / 3),
-                     'erf': math.erf,
-                     'erfc': math.erfc}
+        if op == 'neg':
+            item_name = Node._apply_parenthesis_if_needed(item, op)
+            name = f"-{item_name}"
+        else:
+            name = f"{op}({item.name})"
 
         def value_fn():
-            return functions[op](item.value_fn())
+            return unary_operations[op](item.value_fn())
 
         def gradient_fn():
             if op == 'neg':
@@ -229,19 +292,16 @@ class Variable:
         return Node(name=name, variables=variables, operation=op, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
-    def _binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
+    def binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
         left = Variable._ensure_is_variable(left)
         right = Variable._ensure_is_variable(right)
         variables = left.variables.union(right.variables)
-        name = f"({left.name} {op} {right.name})"
-        functions = {'+': float.__add__,
-                     '-': float.__sub__,
-                     '*': float.__mul__,
-                     '/': float.__truediv__,
-                     '**': float.__pow__}
+        left_name = Node._apply_parenthesis_if_needed(left, op)
+        right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
+        name = f"{left_name} {op} {right_name}"
 
         def value_fn():
-            return functions[op](left.value_fn(), right.value_fn())
+            return binary_operations[op](left.value_fn(), right.value_fn())
 
         def gradient_fn():
             if op == '+':
@@ -261,14 +321,6 @@ class Variable:
             return (left, grad_left), (right, grad_right)
 
         return Node(name=name, variables=variables, operation=op, value_fn=value_fn, gradient_fn=gradient_fn)
-
-
-class Node(Variable):
-    def __init__(self, name: str, variables: Set[Variable] = None, operation: str = None,
-                 value_fn: Callable[[], float] = None, gradient_fn: Callable[[], Tuple[Tuple[Variable, float], ...]] = lambda: []):
-        super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
-        self.variables = {self} if variables is None else variables
-        self.operation = operation
 
 
 def exp(variable):
@@ -354,10 +406,10 @@ if __name__ == "__main__":
     z = Variable('z')
 
     formula = exp((x + y) * (x - y) / (x ** z))
-    print(f"f(x, y, z) = {formula}")                               # Displays the formula
+    print(f"f(x, y, z) = {formula}")  # Displays the formula
 
     evaluation = formula.evaluate({x: 2, y: 3, z: 4})
-    print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")    # Evaluation of the expression
+    print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")  # Evaluation of the expression
 
     grads = formula.grads
     print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {grads[x]}")  # Gradient with respect to x
