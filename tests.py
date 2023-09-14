@@ -1,6 +1,6 @@
 import unittest
 import math
-from automatic_differentiation import Variable, sin, cos, tan, exp, sqrt
+from automatic_differentiation import Variable, sin, cos, tan, exp, sqrt, cbrt
 
 
 class TestVariable(unittest.TestCase):
@@ -227,6 +227,17 @@ class TestVariable(unittest.TestCase):
 
         self.assertEqual(formula.grads[x], 0.5/math.sqrt(5))
 
+    def test_cbrt(self):
+        x = Variable('x')
+
+        formula = cbrt(x)
+        self.assertEqual(str(formula), "cbrt(x)")
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertAlmostEqual(evaluation_result, 1.70997594667669698935310887, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 0.11399839644511313, places=12)
+
     def test_composition1(self):
         x = Variable('x')
         y = Variable('y')
@@ -384,6 +395,17 @@ class TestVariable(unittest.TestCase):
         self.assertAlmostEqual(evaluation_result, 7 * math.exp(7), places=12)
 
         self.assertAlmostEqual(formula.grads[x], 8 * math.exp(7), places=12)
+
+    def test_composition13(self):
+        x = Variable('x')
+
+        formula = cbrt(x * exp(x))
+        self.assertEqual(str(formula), "cbrt(x * exp(x))")
+
+        evaluation_result = formula.evaluate({x: 7})
+        self.assertAlmostEqual(evaluation_result, 19.7266408519957203353551, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 7.514910800760276, places=12)
 
 
 if __name__ == '__main__':

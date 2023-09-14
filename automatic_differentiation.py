@@ -330,6 +330,17 @@ class Variable:
 
         return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
+    def cbrt(self):
+        name = f"cbrt({self.name})"
+
+        def value_fn():
+            return (self.value_fn()) ** (1 / 3)
+
+        def gradient_fn():
+            return (self, 1 / (3 * self.value_fn() ** (2 / 3))),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
     def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
         """
         Evaluate the variable with given variable assignments.
@@ -396,6 +407,10 @@ def tan(variable):
 
 def sqrt(variable):
     return variable.sqrt() if isinstance(variable, Variable) else math.sqrt(variable)
+
+
+def cbrt(variable):
+    return variable.cbrt() if isinstance(variable, Variable) else variable ** (1 / 3)
 
 
 # Example usage
