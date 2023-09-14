@@ -161,6 +161,17 @@ class TestVariable(unittest.TestCase):
 
         self.assertEqual(formula.grads[x], 8 * math.log(2))
 
+    def test_abs(self):
+        x = Variable('x')
+
+        formula = abs(x)
+        self.assertEqual(str(formula), "abs(x)")
+
+        evaluation_result = formula.evaluate({x: -5})
+        self.assertEqual(evaluation_result, 5)
+
+        self.assertEqual(formula.grads[x], -1)
+
     def test_exp(self):
         x = Variable('x')
 
@@ -347,6 +358,32 @@ class TestVariable(unittest.TestCase):
         self.assertAlmostEqual(formula.grads[x], -0.01280657504669323, places=12)
         self.assertAlmostEqual(formula.grads[y], -0.01920986257003984, places=12)
         self.assertAlmostEqual(formula.grads[z], -0.02561315009338646, places=12)
+
+    def test_composition11(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+
+        formula = abs(-1 / ((x ** 2 + y ** 2) - z ** 2))
+        self.assertEqual(str(formula), "abs(-1 / (((x ** 2 + y ** 2) - z ** 2)))")
+
+        evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+        self.assertAlmostEqual(evaluation_result, 1/3, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 4/9, places=12)
+        self.assertAlmostEqual(formula.grads[y], 2/3, places=12)
+        self.assertAlmostEqual(formula.grads[z], -8/9, places=12)
+
+    def test_composition12(self):
+        x = Variable('x')
+
+        formula = x * exp(x)
+        self.assertEqual(str(formula), "x * exp(x)")
+
+        evaluation_result = formula.evaluate({x: 7})
+        self.assertAlmostEqual(evaluation_result, 7 * math.exp(7), places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 8 * math.exp(7), places=12)
 
 
 if __name__ == '__main__':

@@ -264,6 +264,17 @@ class Variable:
 
         return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
+    def __abs__(self):
+        name = f"abs({self.name})"
+
+        def value_fn():
+            return abs(self.value_fn())
+
+        def gradient_fn():
+            return (self, math.copysign(1, self.value_fn())),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
     def exp(self):
         name = f"exp({self.name})"
 
