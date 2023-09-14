@@ -374,6 +374,72 @@ class Variable:
 
         return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
+    def acos(self):
+        name = f"acos({self.name})"
+
+        def value_fn():
+            return math.acos(self.value_fn())
+
+        def gradient_fn():
+            return (self, -1.0 / math.sqrt(1 - self.value_fn() ** 2)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def acosh(self):
+        name = f"acosh({self.name})"
+
+        def value_fn():
+            return math.acosh(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / math.sqrt(self.value_fn() ** 2 - 1)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def asin(self):
+        name = f"asin({self.name})"
+
+        def value_fn():
+            return math.asin(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / math.sqrt(1 - self.value_fn() ** 2)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def asinh(self):
+        name = f"asinh({self.name})"
+
+        def value_fn():
+            return math.asinh(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / math.sqrt(1 + self.value_fn() ** 2)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def atan(self):
+        name = f"atan({self.name})"
+
+        def value_fn():
+            return math.atan(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / (1 + self.value_fn() ** 2)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def atanh(self):
+        name = f"atanh({self.name})"
+
+        def value_fn():
+            return math.atanh(self.value_fn())
+
+        def gradient_fn():
+            return (self, 1.0 / (1 - self.value_fn() ** 2)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
     def sqrt(self):
         name = f"sqrt({self.name})"
 
@@ -393,6 +459,28 @@ class Variable:
 
         def gradient_fn():
             return (self, 1 / (3 * self.value_fn() ** (2 / 3))),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def erf(self):
+        name = f"erf({self.name})"
+
+        def value_fn():
+            return math.erf(self.value_fn())
+
+        def gradient_fn():
+            return (self, 2 * math.exp(-self.value_fn() ** 2) / math.sqrt(math.pi)),
+
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+
+    def erfc(self):
+        name = f"erfc({self.name})"
+
+        def value_fn():
+            return math.erfc(self.value_fn())
+
+        def gradient_fn():
+            return (self, -2 * math.exp(-self.value_fn() ** 2) / math.sqrt(math.pi)),
 
         return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
@@ -480,12 +568,44 @@ def tanh(variable):
     return variable.tanh() if isinstance(variable, Variable) else math.tanh(variable)
 
 
+def acos(variable):
+    return variable.acos() if isinstance(variable, Variable) else math.acos(variable)
+
+
+def acosh(variable):
+    return variable.acosh() if isinstance(variable, Variable) else math.acosh(variable)
+
+
+def asin(variable):
+    return variable.asin() if isinstance(variable, Variable) else math.asin(variable)
+
+
+def asinh(variable):
+    return variable.asinh() if isinstance(variable, Variable) else math.asinh(variable)
+
+
+def atan(variable):
+    return variable.atan() if isinstance(variable, Variable) else math.atan(variable)
+
+
+def atanh(variable):
+    return variable.atanh() if isinstance(variable, Variable) else math.atanh(variable)
+
+
 def sqrt(variable):
     return variable.sqrt() if isinstance(variable, Variable) else math.sqrt(variable)
 
 
 def cbrt(variable):
     return variable.cbrt() if isinstance(variable, Variable) else variable ** (1 / 3)
+
+
+def erf(variable):
+    return variable.erf() if isinstance(variable, Variable) else math.erf(variable)
+
+
+def erfc(variable):
+    return variable.erfc() if isinstance(variable, Variable) else math.erfc(variable)
 
 
 # Example usage
