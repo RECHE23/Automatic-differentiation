@@ -5,40 +5,10 @@ import math
 
 
 class Variable:
-    """
-    A class representing a variable for automatic differentiation.
-
-    Parameters:
-    ----------
-    name : str
-        The name of the variable.
-    value : SupportsFloat, optional
-        The initial value of the variable.
-    variables : Set[Variable], optional
-        A set of variables that this variable depends on.
-    value_fn : Callable[[], float], optional
-        A function that returns the current value of the variable.
-    gradient_fn : Callable[[], Tuple[Tuple[Variable, float], ...]], optional
-        A function that returns a tuple of (variable, gradient) pairs.
-
-    Attributes:
-    ----------
-    name : str
-        The name of the variable.
-    variables : Set[Variable]
-        A set of variables that this variable depends on.
-    value : float
-        The current value of the variable.
-    value_fn : Callable[[], float]
-        A function that returns the current value of the variable.
-    gradient_fn : Callable[[], Tuple[Tuple[Variable, float], ...]]
-        A function that returns a tuple of (variable, gradient) pairs.
-    """
-
-    def __init__(self, name: str, value: SupportsFloat = None, variables: Set[Variable] = None,
+    def __init__(self, name: str, value: SupportsFloat = None,
                  value_fn: Callable[[], float] = None, gradient_fn: Callable[[], Tuple[Tuple[Variable, float], ...]] = lambda: []):
         self.name = name
-        self.variables = {self} if variables is None else variables
+        self.variables = {self}
         self._value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn
@@ -59,131 +29,40 @@ class Variable:
 
     @property
     def grads(self) -> Dict[Variable, float]:
-        """
-        Get the gradients of the variable.
-
-        Returns:
-        ----------
-        Dict[Variable, float]
-            A dictionary containing gradients with respect to this variable.
-        """
         assert all(v.value is not None for v in self.variables), "An evaluation of the formula must be done before trying to read the grads."
         return self.compute_gradients()
 
-    def __add__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Addition operator for variables.
+    def __add__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(self, other, "+")
 
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to add to this variable.
+    def __radd__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(other, self, "+")
 
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the addition.
-        """
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(self, other_var, "+")
+    def __sub__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(self, other, "-")
 
-    def __radd__(self, other):
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(other_var, self, "+")
+    def __rsub__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(other, self, "-")
 
-    def __sub__(self, other):
-        """
-        Subtraction operator for variables.
+    def __mul__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(self, other, "*")
 
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to subtract from this variable.
+    def __rmul__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(other, self, "*")
 
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the subtraction.
-        """
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(self, other_var, "-")
+    def __truediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(self, other, "/")
 
-    def __rsub__(self, other):
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(other_var, self, "-")
+    def __rtruediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(other, self, "/")
 
-    def __mul__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Multiplication operator for variables.
+    def __pow__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(self, other, "**")
 
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to multiply with this variable.
+    def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Node:
+        return self._binary_operation(other, self, "**")
 
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the multiplication.
-        """
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(self, other_var, "*")
-
-    def __rmul__(self, other):
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(other_var, self, "*")
-
-    def __truediv__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Division operator for variables.
-
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to divide this variable by.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the division.
-        """
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(self, other_var, "/")
-
-    def __rtruediv__(self, other):
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(other_var, self, "/")
-
-    def __pow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Exponentiation operator for variables.
-
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The exponent to raise this variable to.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the exponentiation.
-        """
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(self, other_var, "**")
-
-    def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        other_var = self._ensure_is_variable(other)
-        return self._binary_operation(other_var, self, "**")
-
-    def __neg__(self):
-        """
-        Negation operator for variables.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the negation of this variable.
-        """
+    def __neg__(self) -> Node:
         name = f"(-{self.name})"
 
         def value_fn():
@@ -192,9 +71,9 @@ class Variable:
         def gradient_fn():
             return (self, -1.0),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='neg', value_fn=value_fn, gradient_fn=gradient_fn)
 
-    def __abs__(self):
+    def __abs__(self) -> Node:
         name = f"abs({self.name})"
 
         def value_fn():
@@ -203,7 +82,7 @@ class Variable:
         def gradient_fn():
             return (self, math.copysign(1, self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='abs', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def exp(self):
         name = f"exp({self.name})"
@@ -214,7 +93,7 @@ class Variable:
         def gradient_fn():
             return (self, math.exp(self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='exp', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def log(self):
         name = f"log({self.name})"
@@ -225,7 +104,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / self.value_fn()),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='log', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def log10(self):
         name = f"log10({self.name})"
@@ -236,7 +115,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / (self.value_fn() * math.log(10.0))),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='log10', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def sin(self):
         name = f"sin({self.name})"
@@ -247,7 +126,7 @@ class Variable:
         def gradient_fn():
             return (self, math.cos(self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='sin', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def cos(self):
         name = f"cos({self.name})"
@@ -258,7 +137,7 @@ class Variable:
         def gradient_fn():
             return (self, -math.sin(self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='cos', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def tan(self):
         name = f"tan({self.name})"
@@ -269,7 +148,7 @@ class Variable:
         def gradient_fn():
             return (self, 1 / math.cos(self.value_fn()) ** 2),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='tan', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def sinh(self):
         name = f"sinh({self.name})"
@@ -280,7 +159,7 @@ class Variable:
         def gradient_fn():
             return (self, math.cosh(self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='sinh', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def cosh(self):
         name = f"cosh({self.name})"
@@ -291,7 +170,7 @@ class Variable:
         def gradient_fn():
             return (self, math.sinh(self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='cosh', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def tanh(self):
         name = f"tanh({self.name})"
@@ -302,7 +181,7 @@ class Variable:
         def gradient_fn():
             return (self, 1 / math.cosh(self.value_fn()) ** 2),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='tanh', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def acos(self):
         name = f"acos({self.name})"
@@ -313,7 +192,7 @@ class Variable:
         def gradient_fn():
             return (self, -1.0 / math.sqrt(1 - self.value_fn() ** 2)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='acos', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def acosh(self):
         name = f"acosh({self.name})"
@@ -324,7 +203,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / math.sqrt(self.value_fn() ** 2 - 1)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='acosh', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def asin(self):
         name = f"asin({self.name})"
@@ -335,7 +214,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / math.sqrt(1 - self.value_fn() ** 2)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='asin', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def asinh(self):
         name = f"asinh({self.name})"
@@ -346,7 +225,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / math.sqrt(1 + self.value_fn() ** 2)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='asinh', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def atan(self):
         name = f"atan({self.name})"
@@ -357,7 +236,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / (1 + self.value_fn() ** 2)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='atan', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def atanh(self):
         name = f"atanh({self.name})"
@@ -368,7 +247,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0 / (1 - self.value_fn() ** 2)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='atanh', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def sqrt(self):
         name = f"sqrt({self.name})"
@@ -379,7 +258,7 @@ class Variable:
         def gradient_fn():
             return (self, 0.5 / math.sqrt(self.value_fn())),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='sqrt', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def cbrt(self):
         name = f"cbrt({self.name})"
@@ -390,7 +269,7 @@ class Variable:
         def gradient_fn():
             return (self, 1 / (3 * self.value_fn() ** (2 / 3))),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='cbrt', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def erf(self):
         name = f"erf({self.name})"
@@ -401,7 +280,7 @@ class Variable:
         def gradient_fn():
             return (self, 2 * math.exp(-self.value_fn() ** 2) / math.sqrt(math.pi)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='erf', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def erfc(self):
         name = f"erfc({self.name})"
@@ -412,41 +291,13 @@ class Variable:
         def gradient_fn():
             return (self, -2 * math.exp(-self.value_fn() ** 2) / math.sqrt(math.pi)),
 
-        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=self.variables, operation='erfc', value_fn=value_fn, gradient_fn=gradient_fn)
 
     def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
-        """
-        Evaluate the variable with given variable assignments.
-
-        Parameters:
-        ----------
-        variable_assignments : Dict[Variable, SupportsFloat]
-            A dictionary containing variable assignments.
-
-        Returns:
-        ----------
-        float
-            The result of the evaluation.
-        """
         self._apply_variable_assignments(variable_assignments)
         return self.value_fn()
 
     def compute_gradients(self, variable_assignments: Dict[Variable, SupportsFloat] = None, backpropagation: float = 1.0) -> Dict[Variable, float]:
-        """
-        Compute gradients of the variable.
-
-        Parameters:
-        ----------
-        variable_assignments : Dict[Variable, SupportsFloat], optional
-            A dictionary containing variable assignments.
-        backpropagation : float, optional
-            The value to backpropagate for computing gradients.
-
-        Returns:
-        ----------
-        Dict[Variable, float]
-            A dictionary containing gradients with respect to specified variables.
-        """
         self._apply_variable_assignments(variable_assignments)
 
         return reduce(
@@ -462,11 +313,13 @@ class Variable:
                 k.value = v
 
     @staticmethod
-    def _ensure_is_variable(other):
+    def _ensure_is_variable(other: Union[Variable, SupportsFloat]):
         return Variable(name=str(other), value=float(other)) if not isinstance(other, Variable) else other
 
     @staticmethod
-    def _binary_operation(left: Variable, right: Variable, op: str) -> Variable:
+    def _binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
+        left = Variable._ensure_is_variable(left)
+        right = Variable._ensure_is_variable(right)
         variables = left.variables.union(right.variables)
         name = f"({left.name} {op} {right.name})"
         functions = {'+': float.__add__,
@@ -495,7 +348,15 @@ class Variable:
 
             return (left, grad_left), (right, grad_right)
 
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=variables, operation=op, value_fn=value_fn, gradient_fn=gradient_fn)
+
+
+class Node(Variable):
+    def __init__(self, name: str, variables: Set[Variable] = None, operation: str = None,
+                 value_fn: Callable[[], float] = None, gradient_fn: Callable[[], Tuple[Tuple[Variable, float], ...]] = lambda: []):
+        super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
+        self.variables = {self} if variables is None else variables
+        self.operation = operation
 
 
 def exp(variable):
