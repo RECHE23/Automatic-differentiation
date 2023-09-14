@@ -63,235 +63,67 @@ class Variable:
         return self._binary_operation(other, self, "**")
 
     def __neg__(self) -> Node:
-        name = f"(-{self.name})"
-
-        def value_fn():
-            return -self.value_fn()
-
-        def gradient_fn():
-            return (self, -1.0),
-
-        return Node(name=name, variables=self.variables, operation='neg', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "neg")
 
     def __abs__(self) -> Node:
-        name = f"abs({self.name})"
-
-        def value_fn():
-            return abs(self.value_fn())
-
-        def gradient_fn():
-            return (self, math.copysign(1, self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='abs', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "abs")
 
     def exp(self):
-        name = f"exp({self.name})"
-
-        def value_fn():
-            return math.exp(self.value_fn())
-
-        def gradient_fn():
-            return (self, math.exp(self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='exp', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "exp")
 
     def log(self):
-        name = f"log({self.name})"
-
-        def value_fn():
-            return math.log(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / self.value_fn()),
-
-        return Node(name=name, variables=self.variables, operation='log', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "log")
 
     def log10(self):
-        name = f"log10({self.name})"
-
-        def value_fn():
-            return math.log10(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / (self.value_fn() * math.log(10.0))),
-
-        return Node(name=name, variables=self.variables, operation='log10', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "log10")
 
     def sin(self):
-        name = f"sin({self.name})"
-
-        def value_fn():
-            return math.sin(self.value_fn())
-
-        def gradient_fn():
-            return (self, math.cos(self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='sin', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "sin")
 
     def cos(self):
-        name = f"cos({self.name})"
-
-        def value_fn():
-            return math.cos(self.value_fn())
-
-        def gradient_fn():
-            return (self, -math.sin(self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='cos', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "cos")
 
     def tan(self):
-        name = f"tan({self.name})"
-
-        def value_fn():
-            return math.tan(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1 / math.cos(self.value_fn()) ** 2),
-
-        return Node(name=name, variables=self.variables, operation='tan', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "tan")
 
     def sinh(self):
-        name = f"sinh({self.name})"
-
-        def value_fn():
-            return math.sinh(self.value_fn())
-
-        def gradient_fn():
-            return (self, math.cosh(self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='sinh', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "sinh")
 
     def cosh(self):
-        name = f"cosh({self.name})"
-
-        def value_fn():
-            return math.cosh(self.value_fn())
-
-        def gradient_fn():
-            return (self, math.sinh(self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='cosh', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "cosh")
 
     def tanh(self):
-        name = f"tanh({self.name})"
-
-        def value_fn():
-            return math.tanh(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1 / math.cosh(self.value_fn()) ** 2),
-
-        return Node(name=name, variables=self.variables, operation='tanh', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "tanh")
 
     def acos(self):
-        name = f"acos({self.name})"
-
-        def value_fn():
-            return math.acos(self.value_fn())
-
-        def gradient_fn():
-            return (self, -1.0 / math.sqrt(1 - self.value_fn() ** 2)),
-
-        return Node(name=name, variables=self.variables, operation='acos', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "acos")
 
     def acosh(self):
-        name = f"acosh({self.name})"
-
-        def value_fn():
-            return math.acosh(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / math.sqrt(self.value_fn() ** 2 - 1)),
-
-        return Node(name=name, variables=self.variables, operation='acosh', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "acosh")
 
     def asin(self):
-        name = f"asin({self.name})"
-
-        def value_fn():
-            return math.asin(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / math.sqrt(1 - self.value_fn() ** 2)),
-
-        return Node(name=name, variables=self.variables, operation='asin', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "asin")
 
     def asinh(self):
-        name = f"asinh({self.name})"
-
-        def value_fn():
-            return math.asinh(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / math.sqrt(1 + self.value_fn() ** 2)),
-
-        return Node(name=name, variables=self.variables, operation='asinh', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "asinh")
 
     def atan(self):
-        name = f"atan({self.name})"
-
-        def value_fn():
-            return math.atan(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / (1 + self.value_fn() ** 2)),
-
-        return Node(name=name, variables=self.variables, operation='atan', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "atan")
 
     def atanh(self):
-        name = f"atanh({self.name})"
-
-        def value_fn():
-            return math.atanh(self.value_fn())
-
-        def gradient_fn():
-            return (self, 1.0 / (1 - self.value_fn() ** 2)),
-
-        return Node(name=name, variables=self.variables, operation='atanh', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "atanh")
 
     def sqrt(self):
-        name = f"sqrt({self.name})"
-
-        def value_fn():
-            return math.sqrt(self.value_fn())
-
-        def gradient_fn():
-            return (self, 0.5 / math.sqrt(self.value_fn())),
-
-        return Node(name=name, variables=self.variables, operation='sqrt', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "sqrt")
 
     def cbrt(self):
-        name = f"cbrt({self.name})"
-
-        def value_fn():
-            return (self.value_fn()) ** (1 / 3)
-
-        def gradient_fn():
-            return (self, 1 / (3 * self.value_fn() ** (2 / 3))),
-
-        return Node(name=name, variables=self.variables, operation='cbrt', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "cbrt")
 
     def erf(self):
-        name = f"erf({self.name})"
-
-        def value_fn():
-            return math.erf(self.value_fn())
-
-        def gradient_fn():
-            return (self, 2 * math.exp(-self.value_fn() ** 2) / math.sqrt(math.pi)),
-
-        return Node(name=name, variables=self.variables, operation='erf', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "erf")
 
     def erfc(self):
-        name = f"erfc({self.name})"
-
-        def value_fn():
-            return math.erfc(self.value_fn())
-
-        def gradient_fn():
-            return (self, -2 * math.exp(-self.value_fn() ** 2) / math.sqrt(math.pi)),
-
-        return Node(name=name, variables=self.variables, operation='erfc', value_fn=value_fn, gradient_fn=gradient_fn)
+        return self._unary_operation(self, "erfc")
 
     def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
         self._apply_variable_assignments(variable_assignments)
@@ -315,6 +147,86 @@ class Variable:
     @staticmethod
     def _ensure_is_variable(other: Union[Variable, SupportsFloat]):
         return Variable(name=str(other), value=float(other)) if not isinstance(other, Variable) else other
+
+    @staticmethod
+    def _unary_operation(item: Union[Variable, SupportsFloat], op: str) -> Node:
+        item = Variable._ensure_is_variable(item)
+        variables = item.variables
+        name = f"{op}({item.name})" if op != 'neg' else f"-{item.name}"
+        functions = {'neg': float.__neg__,
+                     'abs': float.__abs__,
+                     'exp': math.exp,
+                     'log': math.log,
+                     'log10': math.log10,
+                     'sin': math.sin,
+                     'asin': math.asin,
+                     'cos': math.cos,
+                     'acos': math.acos,
+                     'tan': math.tan,
+                     'atan': math.atan,
+                     'sinh': math.sinh,
+                     'asinh': math.asinh,
+                     'cosh': math.cosh,
+                     'acosh': math.acosh,
+                     'tanh': math.tanh,
+                     'atanh': math.atanh,
+                     'sqrt': math.sqrt,
+                     'cbrt': lambda v: v ** (1 / 3),
+                     'erf': math.erf,
+                     'erfc': math.erfc}
+
+        def value_fn():
+            return functions[op](item.value_fn())
+
+        def gradient_fn():
+            if op == 'neg':
+                grad = -1.0
+            elif op == 'abs':
+                grad = math.copysign(1.0, item.value_fn())
+            elif op == 'exp':
+                grad = math.exp(item.value_fn())
+            elif op == 'log':
+                grad = 1.0 / item.value_fn()
+            elif op == 'log10':
+                grad = 1.0 / (item.value_fn() * math.log(10.0))
+            elif op == 'sin':
+                grad = math.cos(item.value_fn())
+            elif op == 'asin':
+                grad = 1.0 / math.sqrt(1 - item.value_fn() ** 2)
+            elif op == 'cos':
+                grad = -math.sin(item.value_fn())
+            elif op == 'acos':
+                grad = -1.0 / math.sqrt(1.0 - item.value_fn() ** 2.0)
+            elif op == 'tan':
+                grad = 1.0 / math.cos(item.value_fn()) ** 2.0
+            elif op == 'atan':
+                grad = 1.0 / (1.0 + item.value_fn() ** 2.0)
+            elif op == 'sinh':
+                grad = math.cosh(item.value_fn())
+            elif op == 'asinh':
+                grad = 1.0 / math.sqrt(1.0 + item.value_fn() ** 2.0)
+            elif op == 'cosh':
+                grad = math.sinh(item.value_fn())
+            elif op == 'acosh':
+                grad = 1.0 / math.sqrt(item.value_fn() ** 2.0 - 1.0)
+            elif op == 'tanh':
+                grad = 1.0 / math.cosh(item.value_fn()) ** 2.0
+            elif op == 'atanh':
+                grad = 1.0 / (1.0 - item.value_fn() ** 2.0)
+            elif op == 'sqrt':
+                grad = 0.5 / math.sqrt(item.value_fn())
+            elif op == 'cbrt':
+                grad = 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0))
+            elif op == 'erf':
+                grad = 2.0 * math.exp(-item.value_fn() ** 2.0) / math.sqrt(math.pi)
+            elif op == 'erfc':
+                grad = -2.0 * math.exp(-item.value_fn() ** 2.0) / math.sqrt(math.pi)
+            else:
+                raise NotImplementedError
+
+            return (item, grad),
+
+        return Node(name=name, variables=variables, operation=op, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
     def _binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:

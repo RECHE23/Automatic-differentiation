@@ -101,7 +101,7 @@ class TestOperations(unittest.TestCase):
         x = Variable('x')
 
         formula = -x
-        self.assertEqual(str(formula), "(-x)")
+        self.assertEqual(str(formula), "-x")
 
         evaluation_result = formula.evaluate({x: 5})
         self.assertEqual(evaluation_result, -5)
