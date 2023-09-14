@@ -660,5 +660,48 @@ class TestCompositions(unittest.TestCase):
         self.assertEqual(formula.grads[x], -1)
 
 
+class TestMultipleEvaluations(unittest.TestCase):
+
+    def test_multiple_evaluations1(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+
+        formula = (x + y) * (x - y) / x ** z
+        self.assertEqual(str(formula), "(x + y) * (x - y) / x ** z")
+
+        evaluation_result = formula.evaluate({x: 2, y: 3, z: 4})
+        self.assertAlmostEqual(evaluation_result, -0.312500000000000, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 0.875000000000000, places=12)
+        self.assertAlmostEqual(formula.grads[y], -0.375000000000000, places=12)
+        self.assertAlmostEqual(formula.grads[z], 0.216608493924983, places=12)
+
+        evaluation_result = formula.evaluate({x: 5, y: 6, z: 7})
+        self.assertAlmostEqual(evaluation_result, -0.000140800000000, places=12)
+
+        self.assertAlmostEqual(formula.grads[x], 0.000325120000000, places=12)
+        self.assertAlmostEqual(formula.grads[y], -0.000153600000000, places=12)
+        self.assertAlmostEqual(formula.grads[z], 0.000226608858071, places=12)
+
+    def test_multiple_evaluations2(self):
+        x = Variable('x')
+
+        formula = sqrt(exp(tan(cos(sin(x)))))
+        self.assertEqual(str(formula), "sqrt(exp(tan(cos(sin(x)))))")
+
+        evaluation_result = formula.evaluate({x: 3})
+        self.assertAlmostEqual(evaluation_result, 2.142421022934373, places=12)
+        self.assertAlmostEqual(formula.grads[x], 0.495538281180751, places=12)
+
+        evaluation_result = formula.evaluate({x: 5})
+        self.assertAlmostEqual(evaluation_result, 1.382090969428066, places=12)
+        self.assertAlmostEqual(formula.grads[x], 0.227670154879172, places=12)
+
+        evaluation_result = formula.evaluate({x: 7})
+        self.assertAlmostEqual(evaluation_result, 1.659439430273819, places=12)
+        self.assertAlmostEqual(formula.grads[x], -0.774027459779628, places=12)
+
+
 if __name__ == '__main__':
     unittest.main()
