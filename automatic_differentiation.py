@@ -55,7 +55,7 @@ class Variable:
 
     @value.setter
     def value(self, value: SupportsFloat):
-        self._value = value
+        self._value = float(value)
 
     @property
     def grads(self) -> Dict[Variable, float]:
@@ -84,20 +84,96 @@ class Variable:
         Variable
             A new Variable representing the result of the addition.
         """
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        name = f"({self.name} + {other_var.name})"
-
-        def value_fn():
-            return self.value_fn() + other_var.value_fn()
-
-        def gradient_fn():
-            return (self, 1.0), (other_var, 1.0)
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(self, other_var, "+")
 
     def __radd__(self, other):
-        return self.__add__(other)
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(other_var, self, "+")
+
+    def __sub__(self, other):
+        """
+        Subtraction operator for variables.
+
+        Parameters:
+        ----------
+        other : Variable or SupportsFloat
+            The variable or constant to subtract from this variable.
+
+        Returns:
+        ----------
+        Variable
+            A new Variable representing the result of the subtraction.
+        """
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(self, other_var, "-")
+
+    def __rsub__(self, other):
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(other_var, self, "-")
+
+    def __mul__(self, other: Union[Variable, SupportsFloat]) -> Variable:
+        """
+        Multiplication operator for variables.
+
+        Parameters:
+        ----------
+        other : Variable or SupportsFloat
+            The variable or constant to multiply with this variable.
+
+        Returns:
+        ----------
+        Variable
+            A new Variable representing the result of the multiplication.
+        """
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(self, other_var, "*")
+
+    def __rmul__(self, other):
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(other_var, self, "*")
+
+    def __truediv__(self, other: Union[Variable, SupportsFloat]) -> Variable:
+        """
+        Division operator for variables.
+
+        Parameters:
+        ----------
+        other : Variable or SupportsFloat
+            The variable or constant to divide this variable by.
+
+        Returns:
+        ----------
+        Variable
+            A new Variable representing the result of the division.
+        """
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(self, other_var, "/")
+
+    def __rtruediv__(self, other):
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(other_var, self, "/")
+
+    def __pow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
+        """
+        Exponentiation operator for variables.
+
+        Parameters:
+        ----------
+        other : Variable or SupportsFloat
+            The exponent to raise this variable to.
+
+        Returns:
+        ----------
+        Variable
+            A new Variable representing the result of the exponentiation.
+        """
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(self, other_var, "**")
+
+    def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
+        other_var = self._ensure_is_variable(other)
+        return self._binary_operation(other_var, self, "**")
 
     def __neg__(self):
         """
@@ -117,152 +193,6 @@ class Variable:
             return (self, -1.0),
 
         return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
-
-    def __sub__(self, other):
-        """
-        Subtraction operator for variables.
-
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to subtract from this variable.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the subtraction.
-        """
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        name = f"({self.name} - {other_var.name})"
-
-        def value_fn():
-            return self.value_fn() - other_var.value_fn()
-
-        def gradient_fn():
-            return (self, 1.0), (other_var, -1.0)
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
-
-    def __rsub__(self, other):
-        return self.__neg__().__add__(other)
-
-    def __mul__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Multiplication operator for variables.
-
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to multiply with this variable.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the multiplication.
-        """
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        name = f"{self.name} * {other_var.name}"
-
-        def value_fn():
-            return self.value_fn() * other_var.value_fn()
-
-        def gradient_fn():
-            return (self, other_var.value_fn()), (other_var, self.value_fn())
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
-
-    def __rmul__(self, other):
-        return self.__mul__(other)
-
-    def __truediv__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Division operator for variables.
-
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The variable or constant to divide this variable by.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the division.
-        """
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        numerator = f"({self.name})" if len(self.variables) > 1 else self.name
-        denominator = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        name = f"{numerator} / {denominator}"
-
-        def value_fn():
-            return self.value_fn() / other_var.value_fn()
-
-        def gradient_fn():
-            return (self, 1 / other_var.value_fn()), (other_var, - self.value_fn() / other_var.value_fn() ** 2)
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
-
-    def __rtruediv__(self, other):
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        numerator = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        denominator = f"({self.name})" if len(self.variables) > 1 else self.name
-        name = f"{numerator} / {denominator}"
-
-        def value_fn():
-            return other_var.value_fn() / self.value_fn()
-
-        def gradient_fn():
-            return (self, - other_var.value_fn() / self.value_fn() ** 2), (other_var, 1 / self.value_fn())
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
-
-    def __pow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        """
-        Exponentiation operator for variables.
-
-        Parameters:
-        ----------
-        other : Variable or SupportsFloat
-            The exponent to raise this variable to.
-
-        Returns:
-        ----------
-        Variable
-            A new Variable representing the result of the exponentiation.
-        """
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        base = f"({self.name})" if len(self.variables) > 1 else self.name
-        exponent = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        name = f"{base} ** {exponent}"
-
-        def value_fn():
-            return self.value_fn() ** other_var.value_fn()
-
-        def gradient_fn():
-            return ((self, self.value_fn() ** (other_var.value_fn() - 1) * other_var.value_fn()),
-                    (other_var, self.value_fn() ** other_var.value_fn() * math.log(self.value_fn())))
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
-
-    def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
-        other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
-        variables = self.variables.union(other_var.variables)
-        base = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        exponent = f"({self.name})" if len(self.variables) > 1 else self.name
-        name = f"{base} ** {exponent}"
-
-        def value_fn():
-            return other_var.value_fn() ** self.value_fn()
-
-        def gradient_fn():
-            return ((self, other_var.value_fn() ** self.value_fn() * math.log(other_var.value_fn())),
-                    (other_var, other_var.value_fn() ** (self.value_fn() - 1) * self.value_fn()))
-
-        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __abs__(self):
         name = f"abs({self.name})"
@@ -530,6 +460,42 @@ class Variable:
         if variable_assignments is not None:
             for k, v in variable_assignments.items():
                 k.value = v
+
+    @staticmethod
+    def _ensure_is_variable(other):
+        return Variable(name=str(other), value=float(other)) if not isinstance(other, Variable) else other
+
+    @staticmethod
+    def _binary_operation(left: Variable, right: Variable, op: str) -> Variable:
+        variables = left.variables.union(right.variables)
+        name = f"({left.name} {op} {right.name})"
+        functions = {'+': float.__add__,
+                     '-': float.__sub__,
+                     '*': float.__mul__,
+                     '/': float.__truediv__,
+                     '**': float.__pow__}
+
+        def value_fn():
+            return functions[op](left.value_fn(), right.value_fn())
+
+        def gradient_fn():
+            if op == '+':
+                grad_left, grad_right = 1.0, 1.0
+            elif op == '-':
+                grad_left, grad_right = 1.0, -1.0
+            elif op == '*':
+                grad_left, grad_right = right.value_fn(), left.value_fn()
+            elif op == '/':
+                grad_left, grad_right = 1 / right.value_fn(), - left.value_fn() / right.value_fn() ** 2
+            elif op == '**':
+                grad_left = left.value_fn() ** (right.value_fn() - 1) * right.value_fn()
+                grad_right = left.value_fn() ** right.value_fn() * math.log(left.value_fn())
+            else:
+                raise NotImplementedError
+
+            return (left, grad_left), (right, grad_right)
+
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
 
 def exp(variable):
