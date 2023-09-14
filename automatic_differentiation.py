@@ -86,6 +86,7 @@ class Variable:
         """
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        name = f"({self.name} + {other_var.name})"
 
         def value_fn():
             return self.value_fn() + other_var.value_fn()
@@ -93,7 +94,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0), (other_var, 1.0)
 
-        return Variable(name=f"({self.name} + {other_var.name})", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __radd__(self, other):
         return self.__add__(other)
@@ -107,14 +108,15 @@ class Variable:
         Variable
             A new Variable representing the negation of this variable.
         """
+        name = f"(-{self.name})"
 
         def value_fn():
             return -self.value_fn()
 
         def gradient_fn():
-            return ((self, -1.0), )
+            return (self, -1.0),
 
-        return Variable(name=f"(-{self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __sub__(self, other):
         """
@@ -132,6 +134,7 @@ class Variable:
         """
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        name = f"({self.name} - {other_var.name})"
 
         def value_fn():
             return self.value_fn() - other_var.value_fn()
@@ -139,7 +142,7 @@ class Variable:
         def gradient_fn():
             return (self, 1.0), (other_var, -1.0)
 
-        return Variable(name=f"({self.name} - {other_var.name})", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __rsub__(self, other):
         return self.__neg__().__add__(other)
@@ -160,6 +163,7 @@ class Variable:
         """
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        name = f"{self.name} * {other_var.name}"
 
         def value_fn():
             return self.value_fn() * other_var.value_fn()
@@ -167,7 +171,7 @@ class Variable:
         def gradient_fn():
             return (self, other_var.value_fn()), (other_var, self.value_fn())
 
-        return Variable(name=f"{self.name} * {other_var.name}", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __rmul__(self, other):
         return self.__mul__(other)
@@ -188,6 +192,9 @@ class Variable:
         """
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        numerator = f"({self.name})" if len(self.variables) > 1 else self.name
+        denominator = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
+        name = f"{numerator} / {denominator}"
 
         def value_fn():
             return self.value_fn() / other_var.value_fn()
@@ -195,13 +202,14 @@ class Variable:
         def gradient_fn():
             return (self, 1 / other_var.value_fn()), (other_var, - self.value_fn() / other_var.value_fn() ** 2)
 
-        numerator = f"({self.name})" if len(self.variables) > 1 else self.name
-        denominator = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        return Variable(name=f"{numerator} / {denominator}", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __rtruediv__(self, other):
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        numerator = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
+        denominator = f"({self.name})" if len(self.variables) > 1 else self.name
+        name = f"{numerator} / {denominator}"
 
         def value_fn():
             return other_var.value_fn() / self.value_fn()
@@ -209,9 +217,7 @@ class Variable:
         def gradient_fn():
             return (self, - other_var.value_fn() / self.value_fn() ** 2), (other_var, 1 / self.value_fn())
 
-        numerator = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        denominator = f"({self.name})" if len(self.variables) > 1 else self.name
-        return Variable(name=f"{numerator} / {denominator}", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __pow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
         """
@@ -229,6 +235,9 @@ class Variable:
         """
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        base = f"({self.name})" if len(self.variables) > 1 else self.name
+        exponent = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
+        name = f"{base} ** {exponent}"
 
         def value_fn():
             return self.value_fn() ** other_var.value_fn()
@@ -237,13 +246,14 @@ class Variable:
             return ((self, self.value_fn() ** (other_var.value_fn() - 1) * other_var.value_fn()),
                     (other_var, self.value_fn() ** other_var.value_fn() * math.log(self.value_fn())))
 
-        base = f"({self.name})" if len(self.variables) > 1 else self.name
-        exponent = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        return Variable(name=f"{base} ** {exponent}", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Variable:
         other_var = Variable(name=str(other), value=other) if isinstance(other, SupportsFloat) else other
         variables = self.variables.union(other_var.variables)
+        base = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
+        exponent = f"({self.name})" if len(self.variables) > 1 else self.name
+        name = f"{base} ** {exponent}"
 
         def value_fn():
             return other_var.value_fn() ** self.value_fn()
@@ -252,54 +262,62 @@ class Variable:
             return ((self, other_var.value_fn() ** self.value_fn() * math.log(other_var.value_fn())),
                     (other_var, other_var.value_fn() ** (self.value_fn() - 1) * self.value_fn()))
 
-        base = f"({other_var.name})" if len(other_var.variables) > 1 else other_var.name
-        exponent = f"({self.name})" if len(self.variables) > 1 else self.name
-        return Variable(name=f"{base} ** {exponent}", variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def exp(self):
+        name = f"exp({self.name})"
+
         def value_fn():
             return math.exp(self.value_fn())
 
         def gradient_fn():
-            return ((self, math.exp(self.value_fn())), )
+            return (self, math.exp(self.value_fn())),
 
-        return Variable(name=f"exp({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def sin(self):
+        name = f"sin({self.name})"
+
         def value_fn():
             return math.sin(self.value_fn())
 
         def gradient_fn():
-            return ((self, math.cos(self.value_fn())), )
+            return (self, math.cos(self.value_fn())),
 
-        return Variable(name=f"sin({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def cos(self):
+        name = f"cos({self.name})"
+
         def value_fn():
             return math.cos(self.value_fn())
 
         def gradient_fn():
-            return ((self, -math.sin(self.value_fn())), )
+            return (self, -math.sin(self.value_fn())),
 
-        return Variable(name=f"cos({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def tan(self):
+        name = f"tan({self.name})"
+
         def value_fn():
             return math.tan(self.value_fn())
 
         def gradient_fn():
-            return ((self, 1/math.cos(self.value_fn())**2), )
+            return (self, 1 / math.cos(self.value_fn()) ** 2),
 
-        return Variable(name=f"tan({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def sqrt(self):
+        name = f"sqrt({self.name})"
+
         def value_fn():
             return math.sqrt(self.value_fn())
 
         def gradient_fn():
-            return ((self, 0.5 / math.sqrt(self.value_fn())), )
+            return (self, 0.5 / math.sqrt(self.value_fn())),
 
-        return Variable(name=f"sqrt({self.name})", variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Variable(name=name, variables=self.variables, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
         """
@@ -315,9 +333,7 @@ class Variable:
         float
             The result of the evaluation.
         """
-        for k, v in variable_assignments.items():
-            k.value = v
-
+        self._apply_variable_assignments(variable_assignments)
         return self.value_fn()
 
     def compute_gradients(self, variable_assignments: Dict[Variable, SupportsFloat] = None, backpropagation: float = 1.0) -> Dict[Variable, float]:
@@ -336,14 +352,19 @@ class Variable:
         Dict[Variable, float]
             A dictionary containing gradients with respect to specified variables.
         """
-        if variable_assignments is not None:
-            self.evaluate(variable_assignments)
+        self._apply_variable_assignments(variable_assignments)
 
         return reduce(
             lambda a, b: {k: a.get(k, 0) + b.get(k, 0) for k in set(a) | set(b)},
             [var.compute_gradients(variable_assignments, backpropagation=val * backpropagation) for var, val in self.gradient_fn()],
             {self: backpropagation}
         )
+
+    @staticmethod
+    def _apply_variable_assignments(variable_assignments):
+        if variable_assignments is not None:
+            for k, v in variable_assignments.items():
+                k.value = v
 
 
 def exp(variable):
