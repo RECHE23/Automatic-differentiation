@@ -3,6 +3,7 @@ from functools import reduce
 from typing import Set, Union, SupportsFloat, Callable, Tuple, Dict
 import math
 import numpy as np
+import random
 
 unary_operations = {
     'neg': lambda x: -x,
@@ -66,6 +67,7 @@ operation_priority = {
 
 
 class Variable:
+
     def __init__(self, name: str, value: Union[float, np.ndarray] = None,
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
                  gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: [],
@@ -75,15 +77,45 @@ class Variable:
         self._value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn
+        self.constant = constant or not self.variables
+        self.id = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for i in range(16))
 
     def __repr__(self):
-        return self.name
+        value_txt = f", value={self.value}" if self.value is not None else ""
+        name_value_text = f"name='{self.name}'{value_txt}"
+        if self.constant:
+            return f"Constant({name_value_text})"
+        elif isinstance(self, Node):
+            components = [f"{n.name}" if n.constant else f"'{n.name}'" for n in self.components] or ", "
+            components_txt = ", ".join(components)
+            return f"Node({name_value_text}, operation='{self.operation}', components=({components_txt}))"
+        return f"Variable({name_value_text})"
 
     def __str__(self):
         return self.name
 
     @property
+    def _graph(self):
+        if isinstance(self, Node):
+            xlabel = f", xlabel={self.value}" if self.value is not None else ""
+            graph_text = f'  {self.id} [shape=box, label="{self.operation}"];\n'
+            graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.components])
+            graph_text += f"".join([c._graph for c in self.components])
+            return graph_text
+        else:
+            return f'  {self.id} [label="{self.name}"];\n'
+
+    @property
+    def graph(self):
+        return f"digraph {{\n" \
+               f"labelloc=\"t\"" \
+               f"label=\"Evaluation graph\"" \
+               f"{self._graph}}}"
+
+    @property
     def value(self):
+        if self._value is None:
+            return None
         if isinstance(self._value, np.ndarray):
             return self._value
         return float(self._value)
@@ -199,7 +231,8 @@ class Variable:
     def evaluate_at(self, **variable_assignments) -> Union[float, np.ndarray]:
         assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
         self._apply_variable_assignments({v: variable_assignments[v.name] for v in self.variables})
-        return self.value_fn()
+        self.value = self.value_fn()
+        return self.value
 
     def compute_gradients(self, variable_assignments: Dict[Variable, Union[float, np.ndarray]] = None,
                           backpropagation: Union[float, np.ndarray] = 1.0) -> Dict[Variable, Union[float, np.ndarray]]:
@@ -224,12 +257,13 @@ class Variable:
 
 
 class Node(Variable):
-    def __init__(self, name: str, variables: Set[Variable], operation: str = None,
+    def __init__(self, name: str, variables: Set[Variable], operation: str, components: Tuple[Variable, ...],
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
                  gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
         super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.variables = variables
         self.operation = operation
+        self.components = components
 
     @staticmethod
     def _apply_parenthesis_if_needed(item: Variable, op: str, right: bool = False) -> str:
@@ -249,6 +283,7 @@ class Node(Variable):
     def unary_operation(item: Union[Variable, SupportsFloat], op: str) -> Node:
         item = Variable._ensure_is_a_variable(item)
         variables = item.variables
+        components = (item, )
         if op == 'neg':
             item_name = Node._apply_parenthesis_if_needed(item, op)
             name = f"-{item_name}"
@@ -306,13 +341,14 @@ class Node(Variable):
 
             return (item, grad),
 
-        return Node(name=name, variables=variables, operation=op, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=variables, operation=op, components=components, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
     def binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
         variables = left.variables.union(right.variables)
+        components = (left, right)
         left_name = Node._apply_parenthesis_if_needed(left, op)
         right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
         name = f"{left_name} {op} {right_name}"
@@ -340,7 +376,7 @@ class Node(Variable):
 
             return (left, grad_left), (right, grad_right)
 
-        return Node(name=name, variables=variables, operation=op, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=variables, operation=op, components=components, value_fn=value_fn, gradient_fn=gradient_fn)
 
 
 def exp(variable):
