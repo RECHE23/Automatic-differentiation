@@ -14,16 +14,16 @@ Here's a simple example of how you can use this project:
 
 ```python
 from automatic_differentiation import Variable, exp
-    
+
 x = Variable('x')
 y = Variable('y')
 z = Variable('z')
 
 formula = exp((x + y) * (x - y) / (x ** z))
-print(f"f(x, y, z) = {formula}")                               # Displays the formula
+print(f"f(x, y, z) = {formula}")  # Displays the formula
 
-evaluation = formula.evaluate({x: 2, y: 3, z: 4})
-print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")    # Evaluation of the expression
+evaluation = formula.evaluate_at(x=2, y=3, z=4)
+print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")  # Evaluation of the expression
 
 grads = formula.grads
 print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {grads[x]}")  # Gradient with respect to x

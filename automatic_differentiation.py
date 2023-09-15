@@ -68,9 +68,10 @@ operation_priority = {
 class Variable:
     def __init__(self, name: str, value: Union[float, np.ndarray] = None,
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
-                 gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
+                 gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: [],
+                 constant: bool = False):
+        self.variables = set() if constant else {self}
         self.name = name
-        self.variables = {self}
         self._value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn
@@ -195,8 +196,9 @@ class Variable:
     def erfc(self):
         return Node.unary_operation(self, "erfc")
 
-    def evaluate(self, variable_assignments: Dict[Variable, Union[float, np.ndarray]]) -> Union[float, np.ndarray]:
-        self._apply_variable_assignments(variable_assignments)
+    def evaluate_at(self, **variable_assignments) -> Union[float, np.ndarray]:
+        assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
+        self._apply_variable_assignments({v: variable_assignments[v.name] for v in self.variables})
         return self.value_fn()
 
     def compute_gradients(self, variable_assignments: Dict[Variable, Union[float, np.ndarray]] = None,
@@ -218,15 +220,15 @@ class Variable:
 
     @staticmethod
     def _ensure_is_a_variable(other: Union[Variable, SupportsFloat]):
-        return Variable(name=str(other), value=float(other)) if not isinstance(other, Variable) else other
+        return Variable(name=str(other), value=float(other), constant=True) if not isinstance(other, Variable) else other
 
 
 class Node(Variable):
-    def __init__(self, name: str, variables: Set[Variable] = None, operation: str = None,
+    def __init__(self, name: str, variables: Set[Variable], operation: str = None,
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
                  gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
         super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
-        self.variables = {self} if variables is None else variables
+        self.variables = variables
         self.operation = operation
 
     @staticmethod
@@ -424,10 +426,10 @@ if __name__ == "__main__":
     z = Variable('z')
 
     formula = exp((x + y) * (x - y) / (x ** z))
-    print(f"f(x, y, z) = {formula}")  # Displays the formula
+    print(f"f(x, y, z) = {formula}")                               # Displays the formula
 
-    evaluation = formula.evaluate({x: 2, y: 3, z: 4})
-    print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")  # Evaluation of the expression
+    evaluation = formula.evaluate_at(x=2, y=3, z=4)
+    print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")    # Evaluation of the expression
 
     grads = formula.grads
     print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {grads[x]}")  # Gradient with respect to x
