@@ -2,36 +2,38 @@ from __future__ import annotations
 from functools import reduce
 from typing import Set, Union, SupportsFloat, Callable, Tuple, Dict
 import math
+import numpy as np
 
 unary_operations = {
-    'neg': float.__neg__,
-    'abs': float.__abs__,
-    'exp': math.exp,
-    'log': math.log,
-    'log10': math.log10,
-    'sin': math.sin,
-    'asin': math.asin,
-    'cos': math.cos,
-    'acos': math.acos,
-    'tan': math.tan,
-    'atan': math.atan,
-    'sinh': math.sinh,
-    'asinh': math.asinh,
-    'cosh': math.cosh,
-    'acosh': math.acosh,
-    'tanh': math.tanh,
-    'atanh': math.atanh,
-    'sqrt': math.sqrt,
-    'cbrt': lambda v: v ** (1 / 3),
-    'erf': math.erf,
-    'erfc': math.erfc}
+    'neg': lambda x: -x,
+    'abs': np.abs,
+    'exp': np.exp,
+    'log': np.log,
+    'log10': np.log10,
+    'sin': np.sin,
+    'asin': np.arcsin,
+    'cos': np.cos,
+    'acos': np.arccos,
+    'tan': np.tan,
+    'atan': np.arctan,
+    'sinh': np.sinh,
+    'asinh': np.arcsinh,
+    'cosh': np.cosh,
+    'acosh': np.arccosh,
+    'tanh': np.tanh,
+    'atanh': np.arctanh,
+    'sqrt': np.sqrt,
+    'cbrt': np.cbrt,
+    'erf': np.vectorize(math.erf),
+    'erfc': np.vectorize(math.erfc)}
 
 binary_operations = {
-    '+': float.__add__,
-    '-': float.__sub__,
-    '*': float.__mul__,
-    '/': float.__truediv__,
-    '**': float.__pow__}
+    '+': lambda x, y: x + y,
+    '-': lambda x, y: x - y,
+    '*': lambda x, y: x * y,
+    '/': lambda x, y: x / y,
+    '**': lambda x, y: x ** y,
+    '@': lambda x, y: x @ y}
 
 operation_priority = {
     '**': 0,
@@ -58,13 +60,15 @@ operation_priority = {
     'erfc': 1,
     '*': 2,
     '/': 2,
+    '@': 2,
     '+': 3,
     '-': 3}
 
 
 class Variable:
-    def __init__(self, name: str, value: SupportsFloat = None,
-                 value_fn: Callable[[], float] = None, gradient_fn: Callable[[], Tuple[Tuple[Variable, float], ...]] = lambda: []):
+    def __init__(self, name: str, value: Union[float, np.ndarray] = None,
+                 value_fn: Callable[[], Union[float, np.ndarray]] = None,
+                 gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
         self.name = name
         self.variables = {self}
         self._value = value
@@ -79,11 +83,13 @@ class Variable:
 
     @property
     def value(self):
-        return self._value
+        if isinstance(self._value, np.ndarray):
+            return self._value
+        return float(self._value)
 
     @value.setter
-    def value(self, value: SupportsFloat):
-        self._value = float(value)
+    def value(self, value: Union[float, np.ndarray]):
+        self._value = value
 
     @property
     def grads(self) -> Dict[Variable, float]:
@@ -113,6 +119,12 @@ class Variable:
 
     def __rtruediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
         return Node.binary_operation(other, self, "/")
+
+    def __matmul__(self, other: Union[Variable, np.ndarray]) -> Node:
+        return Node.binary_operation(self, other, "@")
+
+    def __rmatmul__(self, other: Union[Variable, np.ndarray]) -> Node:
+        return Node.binary_operation(other, self, "@")
 
     def __pow__(self, other: Union[Variable, SupportsFloat]) -> Node:
         return Node.binary_operation(self, other, "**")
@@ -183,16 +195,18 @@ class Variable:
     def erfc(self):
         return Node.unary_operation(self, "erfc")
 
-    def evaluate(self, variable_assignments: Dict[Variable, SupportsFloat]) -> float:
+    def evaluate(self, variable_assignments: Dict[Variable, Union[float, np.ndarray]]) -> Union[float, np.ndarray]:
         self._apply_variable_assignments(variable_assignments)
         return self.value_fn()
 
-    def compute_gradients(self, variable_assignments: Dict[Variable, SupportsFloat] = None, backpropagation: float = 1.0) -> Dict[Variable, float]:
+    def compute_gradients(self, variable_assignments: Dict[Variable, Union[float, np.ndarray]] = None,
+                          backpropagation: Union[float, np.ndarray] = 1.0) -> Dict[Variable, Union[float, np.ndarray]]:
         self._apply_variable_assignments(variable_assignments)
 
         return reduce(
             lambda a, b: {k: a.get(k, 0) + b.get(k, 0) for k in set(a) | set(b)},
-            [var.compute_gradients(variable_assignments, backpropagation=val * backpropagation) for var, val in self.gradient_fn()],
+            [var.compute_gradients(variable_assignments, backpropagation=val * backpropagation) for var, val in
+             self.gradient_fn()],
             {self: backpropagation}
         )
 
@@ -203,13 +217,14 @@ class Variable:
                 k.value = v
 
     @staticmethod
-    def _ensure_is_variable(other: Union[Variable, SupportsFloat]):
+    def _ensure_is_a_variable(other: Union[Variable, SupportsFloat]):
         return Variable(name=str(other), value=float(other)) if not isinstance(other, Variable) else other
 
 
 class Node(Variable):
     def __init__(self, name: str, variables: Set[Variable] = None, operation: str = None,
-                 value_fn: Callable[[], float] = None, gradient_fn: Callable[[], Tuple[Tuple[Variable, float], ...]] = lambda: []):
+                 value_fn: Callable[[], Union[float, np.ndarray]] = None,
+                 gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
         super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.variables = {self} if variables is None else variables
         self.operation = operation
@@ -230,7 +245,7 @@ class Node(Variable):
 
     @staticmethod
     def unary_operation(item: Union[Variable, SupportsFloat], op: str) -> Node:
-        item = Variable._ensure_is_variable(item)
+        item = Variable._ensure_is_a_variable(item)
         variables = item.variables
         if op == 'neg':
             item_name = Node._apply_parenthesis_if_needed(item, op)
@@ -243,47 +258,47 @@ class Node(Variable):
 
         def gradient_fn():
             if op == 'neg':
-                grad = -1.0
+                grad = -np.ones_like(item.value_fn())
             elif op == 'abs':
-                grad = math.copysign(1.0, item.value_fn())
+                grad = np.sign(item.value_fn())
             elif op == 'exp':
-                grad = math.exp(item.value_fn())
+                grad = np.exp(item.value_fn())
             elif op == 'log':
                 grad = 1.0 / item.value_fn()
             elif op == 'log10':
-                grad = 1.0 / (item.value_fn() * math.log(10.0))
+                grad = 1.0 / (item.value_fn() * np.log(10.0))
             elif op == 'sin':
-                grad = math.cos(item.value_fn())
+                grad = np.cos(item.value_fn())
             elif op == 'asin':
-                grad = 1.0 / math.sqrt(1 - item.value_fn() ** 2)
+                grad = 1.0 / np.sqrt(1 - item.value_fn() ** 2)
             elif op == 'cos':
-                grad = -math.sin(item.value_fn())
+                grad = -np.sin(item.value_fn())
             elif op == 'acos':
-                grad = -1.0 / math.sqrt(1.0 - item.value_fn() ** 2.0)
+                grad = -1.0 / np.sqrt(1.0 - item.value_fn() ** 2.0)
             elif op == 'tan':
-                grad = 1.0 / math.cos(item.value_fn()) ** 2.0
+                grad = 1.0 / np.cos(item.value_fn()) ** 2.0
             elif op == 'atan':
                 grad = 1.0 / (1.0 + item.value_fn() ** 2.0)
             elif op == 'sinh':
-                grad = math.cosh(item.value_fn())
+                grad = np.cosh(item.value_fn())
             elif op == 'asinh':
-                grad = 1.0 / math.sqrt(1.0 + item.value_fn() ** 2.0)
+                grad = 1.0 / np.sqrt(1.0 + item.value_fn() ** 2.0)
             elif op == 'cosh':
-                grad = math.sinh(item.value_fn())
+                grad = np.sinh(item.value_fn())
             elif op == 'acosh':
-                grad = 1.0 / math.sqrt(item.value_fn() ** 2.0 - 1.0)
+                grad = 1.0 / np.sqrt(item.value_fn() ** 2.0 - 1.0)
             elif op == 'tanh':
-                grad = 1.0 / math.cosh(item.value_fn()) ** 2.0
+                grad = 1.0 / np.cosh(item.value_fn()) ** 2.0
             elif op == 'atanh':
                 grad = 1.0 / (1.0 - item.value_fn() ** 2.0)
             elif op == 'sqrt':
-                grad = 0.5 / math.sqrt(item.value_fn())
+                grad = 0.5 / np.sqrt(item.value_fn())
             elif op == 'cbrt':
                 grad = 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0))
             elif op == 'erf':
-                grad = 2.0 * math.exp(-item.value_fn() ** 2.0) / math.sqrt(math.pi)
+                grad = 2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi)
             elif op == 'erfc':
-                grad = -2.0 * math.exp(-item.value_fn() ** 2.0) / math.sqrt(math.pi)
+                grad = -2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi)
             else:
                 raise NotImplementedError
 
@@ -293,8 +308,8 @@ class Node(Variable):
 
     @staticmethod
     def binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
-        left = Variable._ensure_is_variable(left)
-        right = Variable._ensure_is_variable(right)
+        left = Variable._ensure_is_a_variable(left)
+        right = Variable._ensure_is_a_variable(right)
         variables = left.variables.union(right.variables)
         left_name = Node._apply_parenthesis_if_needed(left, op)
         right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
@@ -305,16 +320,19 @@ class Node(Variable):
 
         def gradient_fn():
             if op == '+':
-                grad_left, grad_right = 1.0, 1.0
+                grad_left, grad_right = np.ones_like(left.value_fn()), np.ones_like(right.value_fn())
             elif op == '-':
-                grad_left, grad_right = 1.0, -1.0
+                grad_left, grad_right = np.ones_like(left.value_fn()), -np.ones_like(right.value_fn())
             elif op == '*':
                 grad_left, grad_right = right.value_fn(), left.value_fn()
             elif op == '/':
                 grad_left, grad_right = 1 / right.value_fn(), - left.value_fn() / right.value_fn() ** 2
+            elif op == '@':
+                raise NotImplementedError
+                #grad_left, grad_right = TODO...
             elif op == '**':
                 grad_left = left.value_fn() ** (right.value_fn() - 1) * right.value_fn()
-                grad_right = left.value_fn() ** right.value_fn() * math.log(left.value_fn())
+                grad_right = left.value_fn() ** right.value_fn() * np.log(left.value_fn())
             else:
                 raise NotImplementedError
 
@@ -324,79 +342,79 @@ class Node(Variable):
 
 
 def exp(variable):
-    return variable.exp() if isinstance(variable, Variable) else math.exp(variable)
+    return variable.exp() if isinstance(variable, Variable) else np.exp(variable)
 
 
 def log(variable):
-    return variable.log() if isinstance(variable, Variable) else math.log(variable)
+    return variable.log() if isinstance(variable, Variable) else np.log(variable)
 
 
 def log10(variable):
-    return variable.log10() if isinstance(variable, Variable) else math.log10(variable)
+    return variable.log10() if isinstance(variable, Variable) else np.log10(variable)
 
 
 def sin(variable):
-    return variable.sin() if isinstance(variable, Variable) else math.sin(variable)
+    return variable.sin() if isinstance(variable, Variable) else np.sin(variable)
 
 
 def cos(variable):
-    return variable.cos() if isinstance(variable, Variable) else math.cos(variable)
+    return variable.cos() if isinstance(variable, Variable) else np.cos(variable)
 
 
 def tan(variable):
-    return variable.tan() if isinstance(variable, Variable) else math.tan(variable)
+    return variable.tan() if isinstance(variable, Variable) else np.tan(variable)
 
 
 def sinh(variable):
-    return variable.sinh() if isinstance(variable, Variable) else math.sinh(variable)
+    return variable.sinh() if isinstance(variable, Variable) else np.sinh(variable)
 
 
 def cosh(variable):
-    return variable.cosh() if isinstance(variable, Variable) else math.cosh(variable)
+    return variable.cosh() if isinstance(variable, Variable) else np.cosh(variable)
 
 
 def tanh(variable):
-    return variable.tanh() if isinstance(variable, Variable) else math.tanh(variable)
+    return variable.tanh() if isinstance(variable, Variable) else np.tanh(variable)
 
 
 def acos(variable):
-    return variable.acos() if isinstance(variable, Variable) else math.acos(variable)
+    return variable.acos() if isinstance(variable, Variable) else np.arccos(variable)
 
 
 def acosh(variable):
-    return variable.acosh() if isinstance(variable, Variable) else math.acosh(variable)
+    return variable.acosh() if isinstance(variable, Variable) else np.arccosh(variable)
 
 
 def asin(variable):
-    return variable.asin() if isinstance(variable, Variable) else math.asin(variable)
+    return variable.asin() if isinstance(variable, Variable) else np.arcsin(variable)
 
 
 def asinh(variable):
-    return variable.asinh() if isinstance(variable, Variable) else math.asinh(variable)
+    return variable.asinh() if isinstance(variable, Variable) else np.arcsinh(variable)
 
 
 def atan(variable):
-    return variable.atan() if isinstance(variable, Variable) else math.atan(variable)
+    return variable.atan() if isinstance(variable, Variable) else np.arctan(variable)
 
 
 def atanh(variable):
-    return variable.atanh() if isinstance(variable, Variable) else math.atanh(variable)
+    return variable.atanh() if isinstance(variable, Variable) else np.arctanh(variable)
 
 
 def sqrt(variable):
-    return variable.sqrt() if isinstance(variable, Variable) else math.sqrt(variable)
+    return variable.sqrt() if isinstance(variable, Variable) else np.sqrt(variable)
 
 
 def cbrt(variable):
-    return variable.cbrt() if isinstance(variable, Variable) else variable ** (1 / 3)
+    return variable.cbrt() if isinstance(variable, Variable) else np.cbrt(variable)
 
 
 def erf(variable):
-    return variable.erf() if isinstance(variable, Variable) else math.erf(variable)
+    return variable.erf() if isinstance(variable, Variable) else np.vectorize(math.erf)(variable)
 
 
 def erfc(variable):
-    return variable.erfc() if isinstance(variable, Variable) else math.erfc(variable)
+    return variable.erfc() if isinstance(variable, Variable) else np.vectorize(math.erfc)(variable)
 
 
 # Example usage

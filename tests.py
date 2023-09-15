@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, exp, log, log10, sqrt, cbrt, erf, erfc
 
 
@@ -701,6 +702,110 @@ class TestMultipleEvaluations(unittest.TestCase):
         evaluation_result = formula.evaluate({x: 7})
         self.assertAlmostEqual(evaluation_result, 1.659439430273819, places=12)
         self.assertAlmostEqual(formula.grads[x], -0.774027459779628, places=12)
+
+
+class TestNumpyArrayOperations(unittest.TestCase):
+
+    def test_addition(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = x + y
+        x_val = np.array([1.0, 2.0, 3.0])
+        y_val = np.array([4.0, 5.0, 6.0])
+
+        result = formula.evaluate({x: x_val, y: y_val})
+        expected_result = np.array([5.0, 7.0, 9.0])
+        np.testing.assert_array_equal(result, expected_result)
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.array_equal(grads[x], np.array([1.0, 1.0, 1.0])))
+        self.assertTrue(np.array_equal(grads[y], np.array([1.0, 1.0, 1.0])))
+
+    def test_array_subtraction(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = x - y
+        x_val = np.array([1.0, 2.0, 3.0])
+        y_val = np.array([4.0, 5.0, 6.0])
+
+        result = formula.evaluate({x: x_val, y: y_val})
+        np.testing.assert_array_equal(result, np.array([-3.0, -3.0, -3.0]))
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.array_equal(grads[x], np.array([1.0, 1.0, 1.0])))
+        self.assertTrue(np.array_equal(grads[y], np.array([-1.0, -1.0, -1.0])))
+
+    def test_array_multiplication(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = x * y
+        x_val = np.array([1.0, 2.0, 3.0])
+        y_val = np.array([4.0, 5.0, 6.0])
+
+        result = formula.evaluate({x: x_val, y: y_val})
+        np.testing.assert_array_equal(result, np.array([4.0, 10.0, 18.0]))
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.array_equal(grads[x], np.array([4.0, 5.0, 6.0])))
+        self.assertTrue(np.array_equal(grads[y], np.array([1.0, 2.0, 3.0])))
+
+    def test_array_division(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = x / y
+        x_val = np.array([1.0, 2.0, 3.0])
+        y_val = np.array([4.0, 5.0, 6.0])
+
+        result = formula.evaluate({x: x_val, y: y_val})
+        np.testing.assert_array_equal(result, np.array([1/4, 2/5, 1/2]))
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.array_equal(grads[x], np.array([1/4, 1/5, 1/6])))
+        self.assertTrue(np.array_equal(grads[y], np.array([-1/16, -2/25, -1/12])))
+
+    def test_array_exponentiation(self):
+        x = Variable('x')
+        y = Variable('y')
+
+        formula = x ** y
+        x_val = np.array([2.0, 3.0, 4.0])
+        y_val = np.array([2.0, 3.0, 4.0])
+
+        result = formula.evaluate({x: x_val, y: y_val})
+        np.testing.assert_array_equal(result, np.array([4.0, 27.0, 256.0]))
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.allclose(grads[x], y_val * (x_val ** (y_val - 1))))
+        self.assertTrue(np.allclose(grads[y], (x_val ** y_val) * np.log(x_val)))
+
+    def test_sin(self):
+        x = Variable('x')
+
+        formula = sin(x)
+        x_val = np.array([0.0, np.pi / 2, np.pi])
+
+        result = formula.evaluate({x: x_val})
+        expected_result = np.sin(x_val)
+        np.testing.assert_allclose(result, expected_result)
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.allclose(grads[x], np.array([1.0, 0.0, -1.0])))
+
+    def test_exp(self):
+        x = Variable('x')
+
+        formula = exp(x)
+        x_val = np.array([0.0, 1.0, 2.0])
+
+        result = formula.evaluate({x: x_val})
+        np.testing.assert_allclose(result, np.array([1.0, 2.718281828459045, 7.389056098930650]))
+
+        grads = formula.compute_gradients()
+        self.assertTrue(np.array_equal(grads[x], np.array([1.0, 2.718281828459045, 7.389056098930650])))
 
 
 if __name__ == '__main__':
