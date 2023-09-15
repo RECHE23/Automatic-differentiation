@@ -86,9 +86,9 @@ class Variable:
         if self.constant:
             return f"Constant({name_value_text})"
         elif isinstance(self, Node):
-            components = [f"{n.name}" if n.constant else f"'{n.name}'" for n in self.components] or ", "
-            components_txt = ", ".join(components)
-            return f"Node({name_value_text}, operation='{self.operation}', components=({components_txt}))"
+            operands = [f"{n.name}" if n.constant else f"'{n.name}'" for n in self.operands] or ", "
+            operands_txt = ", ".join(operands)
+            return f"Node({name_value_text}, operation='{self.operation}', operands=({operands_txt}))"
         return f"Variable({name_value_text})"
 
     def __str__(self):
@@ -99,8 +99,8 @@ class Variable:
         if isinstance(self, Node):
             xlabel = f", xlabel={self.value}" if self.value is not None else ""
             graph_text = f'  {self.id} [shape=box, label="{self.operation}"];\n'
-            graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.components])
-            graph_text += f"".join([c._graph for c in self.components])
+            graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
+            graph_text += f"".join([c._graph for c in self.operands])
             return graph_text
         else:
             return f'  {self.id} [label="{self.name}"];\n'
@@ -257,13 +257,13 @@ class Variable:
 
 
 class Node(Variable):
-    def __init__(self, name: str, variables: Set[Variable], operation: str, components: Tuple[Variable, ...],
+    def __init__(self, name: str, variables: Set[Variable], operation: str, operands: Tuple[Variable, ...],
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
                  gradient_fn: Callable[[], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
         super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.variables = variables
         self.operation = operation
-        self.components = components
+        self.operands = tuple([Variable._ensure_is_a_variable(operand) for operand in operands])
 
     @staticmethod
     def _apply_parenthesis_if_needed(item: Variable, op: str, right: bool = False) -> str:
@@ -283,7 +283,7 @@ class Node(Variable):
     def unary_operation(item: Union[Variable, SupportsFloat], op: str) -> Node:
         item = Variable._ensure_is_a_variable(item)
         variables = item.variables
-        components = (item, )
+        operands = (item, )
         if op == 'neg':
             item_name = Node._apply_parenthesis_if_needed(item, op)
             name = f"-{item_name}"
@@ -341,14 +341,14 @@ class Node(Variable):
 
             return (item, grad),
 
-        return Node(name=name, variables=variables, operation=op, components=components, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=variables, operation=op, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
     def binary_operation(left: Union[Variable, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
         variables = left.variables.union(right.variables)
-        components = (left, right)
+        operands = (left, right)
         left_name = Node._apply_parenthesis_if_needed(left, op)
         right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
         name = f"{left_name} {op} {right_name}"
@@ -376,7 +376,7 @@ class Node(Variable):
 
             return (left, grad_left), (right, grad_right)
 
-        return Node(name=name, variables=variables, operation=op, components=components, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, variables=variables, operation=op, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
 
 def exp(variable):
