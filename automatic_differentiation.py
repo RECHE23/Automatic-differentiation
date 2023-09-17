@@ -239,12 +239,68 @@ class Variable:
         return Node.unary_operation(self, "abs")
 
     def evaluate_at(self, **variable_assignments: float | np.ndarray) -> float | np.ndarray:
+        """
+        Evaluate the value of the variable with specific variable assignments.
+
+        Parameters
+        ----------
+        **variable_assignments : float | np.ndarray
+            Keyword arguments where the keys are variable names and the values are the assigned values.
+
+        Returns
+        -------
+        float | np.ndarray
+            The evaluated value of the variable after applying the variable assignments.
+
+        Notes
+        -----
+        This method allows you to evaluate the value of the variable within a specific context by providing
+        variable assignments as keyword arguments. It computes the value of the variable by substituting
+        the assigned values for the corresponding variables in its expression.
+
+        Examples
+        --------
+        >>> x, y, z = set_variables('x', 'y', 'z')
+        >>> formula = exp((x + y) * (x - y) / (x ** z))
+        >>> result = formula.evaluate_at(x=2, y=3, z=4)
+        >>> print(result)
+        """
         self._apply_variable_assignments(variable_assignments)
         self.value = self.value_fn()
         return self.value
 
     def compute_gradients(self, variable_assignments: Dict[Variable, float | np.ndarray] = None,
                           backpropagation: float | np.ndarray = None) -> Dict[Variable, float | np.ndarray]:
+        """
+        Compute gradients for the variable.
+
+        Parameters
+        ----------
+        variable_assignments : dict, optional
+            A dictionary where keys are Variable objects or variable names (str), and values are the assigned values.
+            These assignments are used to compute gradients, by default None.
+        backpropagation : float | np.ndarray, optional
+            The backpropagation value used for gradient computation, by default None.
+
+        Returns
+        -------
+        dict
+            A dictionary where keys are Variable objects, and values are the computed gradients.
+
+        Notes
+        -----
+        This method computes gradients of the variable with respect to all other variables in the computation graph.
+        It allows you to perform backpropagation to compute gradients in a reverse mode.
+
+        Examples
+        --------
+        >>> x, y, z = set_variables('x', 'y', 'z')
+        >>> formula = exp((x + y) * (x - y) / (x ** z))
+        >>> grads = formula.compute_gradients(variable_assignments={'x': 2, 'y': 3, 'z': 4})
+        >>> print(grads[x])  # Gradient with respect to x
+        >>> print(grads[y])  # Gradient with respect to y
+        >>> print(grads[z])  # Gradient with respect to z
+        """
         self._apply_variable_assignments(variable_assignments)
 
         if backpropagation is None:
@@ -370,7 +426,10 @@ class Node(Variable):
         return item.name
 
     @staticmethod
-    def unary_operation(item: Variable | np.ndarray | SupportsFloat, op: str) -> Node:
+    def unary_operation(
+            item: Variable | np.ndarray | SupportsFloat,
+            op: str
+    ) -> Node:
         """
         Perform a unary operation on a variable or constant.
 
@@ -583,11 +642,59 @@ def einsum(subscripts: str, *operands: Variable) -> Einsum:
     Einsum
         An Einsum object representing the einsum operation.
 
+    Examples
+    --------
+    >>> x = Variable('x', np.array([[1, 2], [3, 4]]))
+    >>> y = Variable('y', np.array([2, 3]))
+    >>> result = einsum('ij, j -> i', x, y)
+    >>> print(result)
+    einsum(subscripts='ij,j->i', x, y)
+
+    Notes
+    -----
+    This function creates an Einsum object that represents an einsum operation. The subscripts string specifies the
+    contraction pattern, and operands are the variables or constants involved in the operation.
+
     See Also
     --------
     Einsum : Represents an einsum operation in a computational graph.
     """
     return Einsum(subscripts, *operands)
+
+
+def set_variables(*names: str) -> Tuple[Variable, ...]:
+    """
+    Create and return a tuple of Variable objects with the specified names.
+
+    Parameters
+    ----------
+    *names : str
+        Variable names to create.
+
+    Returns
+    -------
+    Tuple[Variable, ...]
+        A tuple containing Variable objects initialized with the provided names.
+
+    Examples
+    --------
+    >>> x, y, z = set_variables('x', 'y', 'z')
+    >>> type(x)
+    <class '__main__.Variable'>
+    >>> type(y)
+    <class '__main__.Variable'>
+    >>> type(z)
+    <class '__main__.Variable'>
+
+    Notes
+    -----
+    This function simplifies the creation of multiple Variable objects with meaningful names in a single line.
+
+    See Also
+    --------
+    Variable : Represents a variable in a computational graph.
+    """
+    return tuple(Variable(name) for name in names)
 
 
 for key in OPERATIONS['unary'].keys():
@@ -603,13 +710,15 @@ for key in OPERATIONS['binary'].keys():
         globals()[key] = func
 
 __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos', 'cos',
-           'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'Variable']
+           'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'Variable',
+           'set_variables']
+
 
 # Example usage
 if __name__ == "__main__":
-    x = Variable('x')
-    y = Variable('y')
-    z = Variable('z')
+
+    print("Example 1: Floating point variables.")
+    x, y, z = set_variables('x', 'y', 'z')
 
     formula = exp((x + y) * (x - y) / (x ** z))
     print(f"f(x, y, z) = {formula}")                               # Displays the formula
@@ -622,14 +731,18 @@ if __name__ == "__main__":
     print(f"∂f({x.value}, {y.value}, {z.value})/∂y = {grads[y]}")  # Gradient with respect to y
     print(f"∂f({x.value}, {y.value}, {z.value})/∂z = {grads[z]}")  # Gradient with respect to z
 
-    A = Variable('A')
-    B = Variable('B')
-    formula = A @ B
-    print(f"f(A, B) = {formula}")
+    print("\nExample 2: Matrix operations.")
+    A, B, C = set_variables('A', 'B', 'C')
+    formula = A @ B + C
+    print(f"f(A, B, C) = {formula}")                               # Displays the formula
 
-    evaluation = formula.evaluate_at(A=np.diag(np.arange(10) + 1), B=np.ones((10, 5)))
-    print(f"f(A, B) = \n{evaluation}")
+    A_val = np.diag(np.arange(10) + 1)
+    B_val = np.ones((10, 5))
+    C_val = np.random.randn(10, 5)
+    evaluation = formula.evaluate_at(A=A_val, B=B_val, C=C_val)    # Evaluation of the expression
+    print(f"f(A, B, C) = \n{evaluation}")
 
     grads = formula.grads
-    print(f"df(A, B)/dA = \n{grads[A]}")
-    print(f"df(A, B)/dB = \n{grads[B]}")
+    print(f"df(A, B, C)/dA = \n{grads[A]}")                        # Gradient with respect to A
+    print(f"df(A, B, C)/dB = \n{grads[B]}")                        # Gradient with respect to B
+    print(f"df(A, B, C)/dB = \n{grads[C]}")                        # Gradient with respect to C
