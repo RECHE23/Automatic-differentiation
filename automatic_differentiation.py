@@ -1,6 +1,6 @@
 from __future__ import annotations
+from typing import List, Optional, Set, Union, SupportsFloat, Callable, Tuple, Dict
 from functools import reduce, partial
-from typing import Union, SupportsFloat, Callable, Tuple, Dict
 import re
 import math
 import numpy as np
@@ -72,6 +72,63 @@ OPERATIONS = {
 
 
 class Variable:
+    """
+    Represents a variable in a computational graph.
+
+    Parameters
+    ----------
+    name : str
+        The name of the variable.
+    value : Union[float, np.ndarray], optional
+        The initial value of the variable, by default None.
+    value_fn : Callable[[], Union[float, np.ndarray]], optional
+        A function that computes the value of the variable, by default None.
+    gradient_fn : Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]], optional
+        A function that computes gradients, by default None.
+
+    Attributes
+    ----------
+    variables : set
+        A set containing all the variables appearing in the graph. This excludes instances of Node and Constant.
+    name : str
+        The name of the variable.
+    id : str
+        A unique identifier for the variable.
+
+    Methods
+    -------
+    __add__(self, other)
+        Perform addition with another variable or constant.
+    __sub__(self, other)
+        Perform subtraction with another variable or constant.
+    __mul__(self, other)
+        Perform multiplication with another variable or constant.
+    __truediv__(self, other)
+        Perform true division with another variable or constant.
+    __matmul__(self, other)
+        Perform matrix multiplication with another variable or constant.
+    __pow__(self, other)
+        Perform exponentiation with another variable or constant.
+    __neg__(self)
+        Negate the variable.
+    __abs__(self)
+        Compute the absolute value of the variable.
+    evaluate_at(**variable_assignments)
+        Evaluate the variable's value with specific variable assignments.
+    compute_gradients(variable_assignments=None, backpropagation=None)
+        Compute gradients for the variable.
+
+    See Also
+    --------
+    Constant : Represents a constant variable.
+    Node : Represents a node in the computation graph.
+    Einsum : Represents an einsum operation.
+    """
+    variables: Set[Variable]
+    name: str
+    value_fn: Callable[[], Union[float, np.ndarray]]
+    gradient_fn: Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]]
+    id: str
 
     def __init__(self, name: str, value: Union[float, np.ndarray] = None,
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
@@ -81,23 +138,22 @@ class Variable:
         self._value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn if gradient_fn is not None else lambda backpropagation: []
-        self.constant = not self.variables
         self.id = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for i in range(16))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         value_txt = f", value={self.value}" if self.value is not None else ""
         name_value_text = f"{self.__class__.__name__}(name='{self.name}'{value_txt}"
         if isinstance(self, Node):
-            operands = [f"{n.name}" if n.constant else f"'{n.name}'" for n in self.operands] or ", "
+            operands = [f"{n.name}" if isinstance(n, Constant) else f"'{n.name}'" for n in self.operands] or ", "
             operands_txt = ", ".join(operands)
             return f"{name_value_text}, operation='{self.operation}', operands=({operands_txt}))"
         return f"{name_value_text})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     @property
-    def _graph(self):
+    def _graph(self) -> str:
         if isinstance(self, Node):
             graph_text = f'  {self.id} [shape=box, label="{self.operation}"];\n'
             graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
@@ -107,20 +163,20 @@ class Variable:
             return f'  {self.id} [label="{self.name}"];\n'
 
     @property
-    def graph(self):
+    def graph(self) -> str:
         return f"digraph {{\n" \
                f"labelloc=\"t\"" \
                f"label=\"Evaluation graph\"" \
                f"{self._graph}}}"
 
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int, ...]:
         if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'shape'):
             return self.value.shape
         return self._shape if hasattr(self, '_shape') else ()
 
     @property
-    def value(self):
+    def value(self) -> Optional[Union[float, np.ndarray]]:
         if self._value is None:
             return None
         if isinstance(self._value, np.ndarray):
@@ -128,7 +184,7 @@ class Variable:
         return float(self._value)
 
     @value.setter
-    def value(self, value: Union[float, np.ndarray]):
+    def value(self, value: Union[float, np.ndarray]) -> None:
         self._value = value
         if isinstance(value, np.ndarray):
             self._shape = value.shape
@@ -180,7 +236,7 @@ class Variable:
     def __abs__(self) -> Node:
         return Node.unary_operation(self, "abs")
 
-    def evaluate_at(self, **variable_assignments) -> Union[float, np.ndarray]:
+    def evaluate_at(self, **variable_assignments: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         self._apply_variable_assignments(variable_assignments)
         self.value = self.value_fn()
         return self.value
@@ -198,7 +254,7 @@ class Variable:
             {self: backpropagation}
         )
 
-    def _apply_variable_assignments(self, variable_assignments):
+    def _apply_variable_assignments(self, variable_assignments: Dict[Union[Variable, str], Union[float, np.ndarray]]) -> None:
         if variable_assignments is not None:
             if all(isinstance(k, Variable) for k in variable_assignments.keys()):
                 # The dictionary is of type Dict[Variable, Union[float, np.ndarray]]:
@@ -217,6 +273,16 @@ class Variable:
 
 
 class Constant(Variable):
+    """
+    Represents a constant variable in a computational graph.
+
+    Parameters
+    ----------
+    value : Union[float, np.ndarray]
+        The constant value.
+    name : str, optional
+        The name of the constant, by default None.
+    """
 
     def __init__(self, value: Union[float, np.ndarray], name: str = None):
         if name is None:
@@ -227,10 +293,27 @@ class Constant(Variable):
                 name = str(value)
         super().__init__(name, value)
         self.variables = set()
-        self.constant = True
 
 
 class Node(Variable):
+    """
+    Represents a node in a computational graph. A node is formed by applying an operation on instances of Variable or Constant.
+
+    Parameters
+    ----------
+    name : str
+        The name of the node.
+    operation : str
+        The operation performed by the node.
+    operands : Tuple[Variable, ...]
+        The operands used in the operation.
+    value_fn : Callable[[], Union[float, np.ndarray]], optional
+        A function that computes the value of the node, by default None.
+    gradient_fn : Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]], optional
+        A function that computes gradients, by default None.
+    """
+    operation: str
+    operands: Tuple[Variable, ...]
 
     def __init__(self, name: str, operation: str, operands: Tuple[Variable, ...],
                  value_fn: Callable[[], Union[float, np.ndarray]] = None,
@@ -242,11 +325,11 @@ class Node(Variable):
 
         self._validate_operands()
 
-    def _apply_variable_assignments(self, variable_assignments):
+    def _apply_variable_assignments(self, variable_assignments: Union[Dict[Union[Variable, str], Union[float, np.ndarray]]]) -> None:
         super()._apply_variable_assignments(variable_assignments)
         self._validate_operands()
 
-    def _validate_operands(self):
+    def _validate_operands(self) -> None:
         n = len(self.operands)
 
         if n == 1:
@@ -282,7 +365,31 @@ class Node(Variable):
 
     @staticmethod
     def unary_operation(item: Union[Variable, np.ndarray, SupportsFloat], op: str) -> Node:
-        assert op in OPERATIONS['unary']
+        """
+        Perform a unary operation on a variable or constant.
+
+        Parameters
+        ----------
+        item : Union[Variable, np.ndarray, SupportsFloat]
+            The input variable, constant, or value.
+        op : str
+            The unary operation to perform.
+
+        Returns
+        -------
+        Node
+            A new Node representing the result of the unary operation.
+
+        Raises
+        ------
+        AssertionError
+            If the specified unary operation is unsupported.
+
+        See Also
+        --------
+        Node : Represents a node in the computation graph.
+        """
+        assert op in OPERATIONS['unary'], f"Unsupported unary operation: {op}"
 
         item = Variable._ensure_is_a_variable(item)
         operands = (item,)
@@ -292,10 +399,10 @@ class Node(Variable):
         else:
             name = f"{op}({item.name})"
 
-        def value_fn():
+        def value_fn() -> Union[float, np.ndarray]:
             return OPERATIONS['unary'][op][0](item.value_fn())
 
-        def gradient_fn(backpropagation):
+        def gradient_fn(backpropagation: Union[float, np.ndarray]) -> Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]:
             grad = OPERATIONS['unary'][op][1](item.value_fn()) * backpropagation
             return (item, grad),
 
@@ -303,7 +410,33 @@ class Node(Variable):
 
     @staticmethod
     def binary_operation(left: Union[Variable, np.ndarray, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
-        assert op in OPERATIONS['binary']
+        """
+        Perform a binary operation on two variables, constants, or values.
+
+        Parameters
+        ----------
+        left : Union[Variable, np.ndarray, SupportsFloat]
+            The left operand.
+        right : Union[Variable, SupportsFloat]
+            The right operand.
+        op : str
+            The binary operation to perform.
+
+        Returns
+        -------
+        Node
+            A new Node representing the result of the binary operation.
+
+        Raises
+        ------
+        AssertionError
+            If the specified binary operation is unsupported.
+
+        See Also
+        --------
+        Node : Represents a node in the computation graph.
+        """
+        assert op in OPERATIONS['binary'], f"Unsupported binary operation: {op}"
 
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
@@ -312,10 +445,10 @@ class Node(Variable):
         right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
         name = f"{left_name} {op} {right_name}"
 
-        def value_fn():
+        def value_fn() -> Union[float, np.ndarray]:
             return OPERATIONS['binary'][op][0](left.value_fn(), right.value_fn())
 
-        def gradient_fn(backpropagation):
+        def gradient_fn(backpropagation: Union[float, np.ndarray]) -> Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]:
 
             grad_left, grad_right = OPERATIONS['binary'][op][1](left.value_fn(), right.value_fn())
 
@@ -332,22 +465,48 @@ class Node(Variable):
 
 
 class Einsum(Node):
+    """
+    Represents an einsum operation in a computational graph.
+
+    Parameters
+    ----------
+    subscripts : str
+        The einsum subscripts string. (i.e. 'ij, jk -> ik')
+    operands : Tuple[Variable]
+        The operands used in the einsum operation.
+    name : str, optional
+        The name of the einsum operation, by default None.
+
+    Raises
+    ------
+    ValueError
+        If the number of operands doesn't match the einsum string or dimensions don't align.
+
+    See Also
+    --------
+    Node : Represents a node in the computation graph.
+    """
+    subscripts: str
+    subscripts_list: List[str]
+    subscript_to_dim: Dict[str, int]
+
     def __init__(self, subscripts: str, *operands: Variable, name: str = None):
-        self.operands = list(operands)
+        self.operands = tuple(operands)
         self.subscripts = re.sub(r'\s+', '', subscripts)
         self.subscripts_list = re.split(r',|->', self.subscripts)
         self.subscript_to_dim = {}
 
         self._validate_operands()
 
-        def value_fn():
-            return np.einsum(self.subscripts, *[operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands])
+        def value_fn() -> np.ndarray:
+            operands_list = [operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands]
+            return np.einsum(self.subscripts, *operands_list, optimize=True)
 
-        def gradient_fn(backpropagation):
+        def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
 
-            def partial_derivative(wrt, previous_grad):
+            def partial_derivative(wrt: Variable, previous_grad: np.ndarray) -> np.ndarray:
                 if wrt not in self.operands:
-                    return 0
+                    return np.zeros_like(wrt.value)
 
                 location = self.operands.index(wrt)
                 order = list(range(len(self.subscripts_list)))
@@ -372,10 +531,10 @@ class Einsum(Node):
         name = name if name is not None else f"einsum(subscripts='{self.subscripts}', {operands_str})"
         super().__init__(name=name, operation="einsum", operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name
 
-    def _validate_operands(self):
+    def _validate_operands(self) -> None:
         if len(self.operands) + 1 != len(self.subscripts_list):
             raise ValueError("Number of operands doesn't match the einsum string!")
 
@@ -397,7 +556,26 @@ class Einsum(Node):
         self._shape = tuple(self.subscript_to_dim.get(letter, 0) for letter in self.subscripts_list[-1])
 
 
-def einsum(subscripts, *operands):
+def einsum(subscripts: str, *operands: Variable) -> Einsum:
+    """
+    Create an einsum operation.
+
+    Parameters
+    ----------
+    subscripts : str
+        The einsum subscripts string.
+    operands : Variable
+        The operands used in the einsum operation.
+
+    Returns
+    -------
+    Einsum
+        An Einsum object representing the einsum operation.
+
+    See Also
+    --------
+    Einsum : Represents an einsum operation in a computational graph.
+    """
     return Einsum(subscripts, *operands)
 
 
