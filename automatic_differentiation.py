@@ -162,18 +162,22 @@ class Variable:
     @property
     def _graph(self) -> str:
         if isinstance(self, Node):
-            graph_text = f'  {self.id} [shape=box, label="{self.operation}"];\n'
+            shape = "octagon" if isinstance(self, Einsum) else "square"
+            graph_text = f'  {self.id} [style=filled, shape={shape}, fillcolor=lavenderblush3, label="{self.operation}"];\n'
             graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
             graph_text += f"".join([c._graph for c in self.operands])
             return graph_text
         else:
-            return f'  {self.id} [label="{self.name}"];\n'
+            shape = ("circle" if len(self.name) <= 3 else "ellipse") if isinstance(self, Constant) else "doublecircle"
+            fillcolor = "ivory3" if isinstance(self, Constant) else "lightsteelblue"
+            return f'  {self.id} [style=filled, shape={shape}, fillcolor={fillcolor}, label="{self.name}"];\n'
 
     @property
     def graph(self) -> str:
         return f"digraph {{\n" \
+               f"  fontsize=15\n" \
                f"  labelloc=\"t\"\n" \
-               f"  label=\"Evaluation graph\"\n" \
+               f"  label=\"Computational graph\"\n" \
                f"{self._graph}}}"
 
     @property
