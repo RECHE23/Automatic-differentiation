@@ -447,10 +447,10 @@ class Node(Variable):
 
 class Einsum(Node):
     def __init__(self, subscripts: str, *operands: Variable, name: str = None):
-        self.subscripts = subscripts
         self.operands = list(operands)
-        self.opnames = re.split(r',|->', self.subscripts)
-        self.letter_to_dim = {}
+        self.subscripts = re.sub(r'\s+', '', subscripts)
+        self.subscripts_list = re.split(r',|->', self.subscripts)
+        self.subscript_to_dim = {}
 
         self._validate_operands()
 
@@ -458,62 +458,58 @@ class Einsum(Node):
             return np.einsum(self.subscripts, *[operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands])
 
         def gradient_fn(backpropagation):
-            return tuple((operand, self.partial_derivative(operand, backpropagation)) for operand in self.operands)
+
+            def partial_derivative(wrt, previous_grad):
+                if wrt not in self.operands:
+                    return 0
+
+                location = self.operands.index(wrt)
+                order = list(range(len(self.subscripts_list)))
+                order[location], order[-1] = order[-1], order[location]
+
+                operands_with_grad = list(np.array(list(self.operands) + [previous_grad], dtype=object)[order])
+                opnames = list(np.array(self.subscripts_list)[order])
+
+                for i, letter in enumerate(re.findall(r'\.{3}|\S', self.subscripts_list[location])):
+                    if letter not in re.findall(r'\.{3}|\S', "".join(opnames[:-1])):
+                        opnames.insert(0, letter)
+                        dim = wrt.shape[i]
+                        var_to_insert = self._ensure_is_a_variable(np.ones(dim))
+                        operands_with_grad.insert(0, var_to_insert)
+
+                subscripts = ",".join(opnames[:-1]) + "->" + opnames[-1]
+                return Einsum(subscripts, *operands_with_grad[:-1]).value_fn()
+
+            return tuple((operand, partial_derivative(operand, backpropagation)) for operand in self.operands)
 
         operands_str = ", ".join([str(operand) for operand in self.operands])
-        name = name if name is not None else f"einsum(subscripts='{self.subscripts}', operands=({operands_str}))"
+        name = name if name is not None else f"einsum(subscripts='{self.subscripts}', {operands_str})"
         super().__init__(name=name, operation="einsum", operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
     def __repr__(self):
-        operands_str = ", ".join([str(operand) for operand in self.operands])
-        name = f"name={self.name}, " if self.name is not None else ""
-        return f"Einsum({name}subscripts='{self.subscripts}', operands=({operands_str}))"
+        return self.name
 
     def _validate_operands(self):
-        if len(self.operands) + 1 != len(self.opnames):
+        if len(self.operands) + 1 != len(self.subscripts_list):
             raise ValueError("Number of operands doesn't match the einsum string!")
 
-        for operand, op_letters in zip(self.operands, self.opnames[:-1]):
-            self._validate_operand(operand, op_letters)
+        for operand, op_letters in zip(self.operands, self.subscripts_list[:-1]):
+            if len(operand.shape) != 0 and len(operand.shape) != len(op_letters) and "..." not in op_letters and op_letters != "":
+                raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{op_letters}'")
 
-        self._shape = tuple(self.letter_to_dim.get(letter, 0) for letter in self.opnames[-1])
+            shp = operand.shape
+            if op_letters[:3] == "...":
+                op_letters = op_letters[::-1]
+                shp = shp[::-1]
 
-    def _validate_operand(self, operand, op_letters):
-        if len(operand.shape) != 0 and len(operand.shape) != len(op_letters) and "..." not in op_letters and op_letters != "":
-            raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{op_letters}'")
+            for i, letter in enumerate(re.findall(r'\.{3}|\S', op_letters)):
+                if i < len(shp):
+                    dim = shp[i] if len(letter) == 1 else shp[i:]
+                    if self.subscript_to_dim.get(letter, dim) != dim:
+                        raise ValueError("Inconsistent dimension names!")
+                    self.subscript_to_dim[letter] = dim
 
-        shp = operand.shape
-        if op_letters[:3] == "...":
-            op_letters = op_letters[::-1]
-            shp = shp[::-1]
-
-        for i, letter in enumerate(re.findall(r'\.{3}|\S', op_letters)):
-            if i < len(shp):
-                dim = shp[i] if len(letter) == 1 else shp[i:]
-                if self.letter_to_dim.get(letter, dim) != dim:
-                    raise ValueError("Inconsistent dimension names!")
-                self.letter_to_dim[letter] = dim
-
-    def partial_derivative(self, wrt, previous_grad):
-        if wrt not in self.operands:
-            return 0
-
-        location = self.operands.index(wrt)
-        order = list(range(len(self.opnames)))
-        order[location], order[-1] = order[-1], order[location]
-
-        operands_with_grad = list(np.array(list(self.operands) + [previous_grad], dtype=object)[order])
-        opnames = list(np.array(self.opnames)[order])
-
-        for i, letter in enumerate(re.findall(r'\.{3}|\S', self.opnames[location])):
-            if letter not in re.findall(r'\.{3}|\S', "".join(opnames[:-1])):
-                opnames.insert(0, letter)
-                dim = wrt.shape[i]
-                var_to_insert = self._ensure_is_a_variable(np.ones(dim))
-                operands_with_grad.insert(0, var_to_insert)
-
-        subscripts = ",".join(opnames[:-1]) + "->" + opnames[-1]
-        return Einsum(subscripts, *operands_with_grad[:-1]).value_fn()
+        self._shape = tuple(self.subscript_to_dim.get(letter, 0) for letter in self.subscripts_list[-1])
 
 
 def exp(variable):
