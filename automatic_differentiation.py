@@ -8,7 +8,11 @@ from typing import List, Optional, Set, SupportsFloat, Callable, Tuple, Dict
 
 import numpy as np
 
+# This allows the declaration of the functions in OPERATIONS at runtime:
+global erf, neg, erfc, sinh, asin, log10, log, atan, sin, asinh, acos, cos, sqrt, acosh, abs, tan, cosh, tanh, exp, cbrt, atanh
+
 OPERATIONS = {
+    # Unary mathematical operations:
     'unary': {
         'neg': (np.negative, lambda val: -np.ones_like(val)),
         'abs': (np.abs, lambda val: np.sign(val)),
@@ -32,6 +36,7 @@ OPERATIONS = {
         'erf': (np.vectorize(math.erf), lambda val: 2.0 * np.exp(-val ** 2.0) / np.sqrt(np.pi)),
         'erfc': (np.vectorize(math.erfc), lambda val: -2.0 * np.exp(-val ** 2.0) / np.sqrt(np.pi))
     },
+    # Binary mathematical operations:
     'binary': {
         '+': (np.add, lambda l_val, r_val: (np.ones_like(l_val), np.ones_like(r_val))),
         '-': (np.subtract, lambda l_val, r_val: (np.ones_like(l_val), -np.ones_like(r_val))),
@@ -40,6 +45,7 @@ OPERATIONS = {
         '@': (np.matmul, lambda l_val, r_val: (r_val.T, l_val.T)),
         '**': (np.power, lambda l_val, r_val: (l_val ** (r_val - 1) * r_val, l_val ** r_val * np.log(l_val))),
     },
+    # Priority of operations (0 being the highest priority):
     'priority': {
         '**': 0,
         'neg': 1,
@@ -697,18 +703,17 @@ def set_variables(*names: str) -> Tuple[Variable, ...]:
     return tuple(Variable(name) for name in names)
 
 
+# Declaration of the unary mathematical functions at runtime:
 for key in OPERATIONS['unary'].keys():
     if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
-        func = partial(Node.unary_operation, op=key)
-        setattr(Variable, key, func)
-        globals()[key] = func
+        globals()[key] = partial(Node.unary_operation, op=key)
 
+# Declaration of the binary mathematical functions at runtime:
 for key in OPERATIONS['binary'].keys():
     if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
-        func = partial(Node.binary_operation, op=key)
-        setattr(Variable, key, func)
-        globals()[key] = func
+        globals()[key] = partial(Node.binary_operation, op=key)
 
+# A list of all the symbols in this module:
 __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos', 'cos',
            'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'Variable',
            'set_variables']
