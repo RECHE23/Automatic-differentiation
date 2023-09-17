@@ -20,10 +20,10 @@ y = Variable('y')
 z = Variable('z')
 
 formula = exp((x + y) * (x - y) / (x ** z))
-print(f"f(x, y, z) = {formula}")  # Displays the formula
+print(f"f(x, y, z) = {formula}")                               # Displays the formula
 
 evaluation = formula.evaluate_at(x=2, y=3, z=4)
-print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")  # Evaluation of the expression
+print(f"f({x.value}, {y.value}, {z.value}) = {evaluation}")    # Evaluation of the expression
 
 grads = formula.grads
 print(f"∂f({x.value}, {y.value}, {z.value})/∂x = {grads[x]}")  # Gradient with respect to x

@@ -1,6 +1,6 @@
 from __future__ import annotations
-from functools import reduce
-from typing import Set, Union, SupportsFloat, Callable, Tuple, Dict
+from functools import reduce, partial
+from typing import Union, SupportsFloat, Callable, Tuple, Dict
 import re
 import math
 import numpy as np
@@ -9,35 +9,35 @@ import random
 
 OPERATIONS = {
     'unary': {
-        'neg': np.negative,
-        'abs': np.abs,
-        'exp': np.exp,
-        'log': np.log,
-        'log10': np.log10,
-        'sin': np.sin,
-        'asin': np.arcsin,
-        'cos': np.cos,
-        'acos': np.arccos,
-        'tan': np.tan,
-        'atan': np.arctan,
-        'sinh': np.sinh,
-        'asinh': np.arcsinh,
-        'cosh': np.cosh,
-        'acosh': np.arccosh,
-        'tanh': np.tanh,
-        'atanh': np.arctanh,
-        'sqrt': np.sqrt,
-        'cbrt': np.cbrt,
-        'erf': np.vectorize(math.erf),
-        'erfc': np.vectorize(math.erfc),
+        'neg': (np.negative, lambda val: -np.ones_like(val)),
+        'abs': (np.abs, lambda val: np.sign(val)),
+        'exp': (np.exp, lambda val: np.exp(val)),
+        'log': (np.log, lambda val: 1.0 / val),
+        'log10': (np.log10, lambda val: 1.0 / (val * np.log(10.0))),
+        'sin': (np.sin, lambda val: np.cos(val)),
+        'asin': (np.arcsin, lambda val: 1.0 / np.sqrt(1 - val ** 2)),
+        'cos': (np.cos, lambda val: -np.sin(val)),
+        'acos': (np.arccos, lambda val: -1.0 / np.sqrt(1.0 - val ** 2.0)),
+        'tan': (np.tan, lambda val: 1.0 / np.cos(val) ** 2.0),
+        'atan': (np.arctan, lambda val: 1.0 / (1.0 + val ** 2.0)),
+        'sinh': (np.sinh, lambda val: np.cosh(val)),
+        'asinh': (np.arcsinh, lambda val: 1.0 / np.sqrt(1.0 + val ** 2.0)),
+        'cosh': (np.cosh, lambda val: np.sinh(val)),
+        'acosh': (np.arccosh, lambda val: 1.0 / np.sqrt(val ** 2.0 - 1.0)),
+        'tanh': (np.tanh, lambda val: 1.0 / np.cosh(val) ** 2.0),
+        'atanh': (np.arctanh, lambda val: 1.0 / (1.0 - val ** 2.0)),
+        'sqrt': (np.sqrt, lambda val: 0.5 / np.sqrt(val)),
+        'cbrt': (np.cbrt, lambda val: 1.0 / (3.0 * val ** (2.0 / 3.0))),
+        'erf': (np.vectorize(math.erf), lambda val: 2.0 * np.exp(-val ** 2.0) / np.sqrt(np.pi)),
+        'erfc': (np.vectorize(math.erfc), lambda val: -2.0 * np.exp(-val ** 2.0) / np.sqrt(np.pi))
     },
     'binary': {
-        '+': np.add,
-        '-': np.subtract,
-        '*': np.multiply,
-        '/': np.divide,
-        '**': np.power,
-        '@': np.matmul,
+        '+': (np.add, lambda l_val, r_val: (np.ones_like(l_val), np.ones_like(r_val))),
+        '-': (np.subtract, lambda l_val, r_val: (np.ones_like(l_val), -np.ones_like(r_val))),
+        '*': (np.multiply, lambda l_val, r_val: (r_val, l_val)),
+        '/': (np.divide, lambda l_val, r_val: (1 / r_val, - l_val / r_val ** 2)),
+        '@': (np.matmul, lambda l_val, r_val: (r_val.T, l_val.T)),
+        '**': (np.power, lambda l_val, r_val: (l_val ** (r_val - 1) * r_val, l_val ** r_val * np.log(l_val))),
     },
     'priority': {
         '**': 0,
@@ -180,63 +180,6 @@ class Variable:
     def __abs__(self) -> Node:
         return Node.unary_operation(self, "abs")
 
-    def exp(self):
-        return Node.unary_operation(self, "exp")
-
-    def log(self):
-        return Node.unary_operation(self, "log")
-
-    def log10(self):
-        return Node.unary_operation(self, "log10")
-
-    def sin(self):
-        return Node.unary_operation(self, "sin")
-
-    def cos(self):
-        return Node.unary_operation(self, "cos")
-
-    def tan(self):
-        return Node.unary_operation(self, "tan")
-
-    def sinh(self):
-        return Node.unary_operation(self, "sinh")
-
-    def cosh(self):
-        return Node.unary_operation(self, "cosh")
-
-    def tanh(self):
-        return Node.unary_operation(self, "tanh")
-
-    def acos(self):
-        return Node.unary_operation(self, "acos")
-
-    def acosh(self):
-        return Node.unary_operation(self, "acosh")
-
-    def asin(self):
-        return Node.unary_operation(self, "asin")
-
-    def asinh(self):
-        return Node.unary_operation(self, "asinh")
-
-    def atan(self):
-        return Node.unary_operation(self, "atan")
-
-    def atanh(self):
-        return Node.unary_operation(self, "atanh")
-
-    def sqrt(self):
-        return Node.unary_operation(self, "sqrt")
-
-    def cbrt(self):
-        return Node.unary_operation(self, "cbrt")
-
-    def erf(self):
-        return Node.unary_operation(self, "erf")
-
-    def erfc(self):
-        return Node.unary_operation(self, "erfc")
-
     def evaluate_at(self, **variable_assignments) -> Union[float, np.ndarray]:
         self._apply_variable_assignments(variable_assignments)
         self.value = self.value_fn()
@@ -339,6 +282,8 @@ class Node(Variable):
 
     @staticmethod
     def unary_operation(item: Union[Variable, np.ndarray, SupportsFloat], op: str) -> Node:
+        assert op in OPERATIONS['unary']
+
         item = Variable._ensure_is_a_variable(item)
         operands = (item,)
         if op == 'neg':
@@ -348,63 +293,18 @@ class Node(Variable):
             name = f"{op}({item.name})"
 
         def value_fn():
-            return OPERATIONS['unary'][op](item.value_fn())
+            return OPERATIONS['unary'][op][0](item.value_fn())
 
         def gradient_fn(backpropagation):
-
-            if op == 'neg':
-                grad = -np.ones_like(item.value_fn())
-            elif op == 'abs':
-                grad = np.sign(item.value_fn())
-            elif op == 'exp':
-                grad = np.exp(item.value_fn())
-            elif op == 'log':
-                grad = 1.0 / item.value_fn()
-            elif op == 'log10':
-                grad = 1.0 / (item.value_fn() * np.log(10.0))
-            elif op == 'sin':
-                grad = np.cos(item.value_fn())
-            elif op == 'asin':
-                grad = 1.0 / np.sqrt(1 - item.value_fn() ** 2)
-            elif op == 'cos':
-                grad = -np.sin(item.value_fn())
-            elif op == 'acos':
-                grad = -1.0 / np.sqrt(1.0 - item.value_fn() ** 2.0)
-            elif op == 'tan':
-                grad = 1.0 / np.cos(item.value_fn()) ** 2.0
-            elif op == 'atan':
-                grad = 1.0 / (1.0 + item.value_fn() ** 2.0)
-            elif op == 'sinh':
-                grad = np.cosh(item.value_fn())
-            elif op == 'asinh':
-                grad = 1.0 / np.sqrt(1.0 + item.value_fn() ** 2.0)
-            elif op == 'cosh':
-                grad = np.sinh(item.value_fn())
-            elif op == 'acosh':
-                grad = 1.0 / np.sqrt(item.value_fn() ** 2.0 - 1.0)
-            elif op == 'tanh':
-                grad = 1.0 / np.cosh(item.value_fn()) ** 2.0
-            elif op == 'atanh':
-                grad = 1.0 / (1.0 - item.value_fn() ** 2.0)
-            elif op == 'sqrt':
-                grad = 0.5 / np.sqrt(item.value_fn())
-            elif op == 'cbrt':
-                grad = 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0))
-            elif op == 'erf':
-                grad = 2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi)
-            elif op == 'erfc':
-                grad = -2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi)
-            else:
-                raise NotImplementedError
-
-            grad *= backpropagation
-
+            grad = OPERATIONS['unary'][op][1](item.value_fn()) * backpropagation
             return (item, grad),
 
         return Node(name=name, operation=op, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
     def binary_operation(left: Union[Variable, np.ndarray, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
+        assert op in OPERATIONS['binary']
+
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
         operands = (left, right)
@@ -413,29 +313,15 @@ class Node(Variable):
         name = f"{left_name} {op} {right_name}"
 
         def value_fn():
-            return OPERATIONS['binary'][op](left.value_fn(), right.value_fn())
+            return OPERATIONS['binary'][op][0](left.value_fn(), right.value_fn())
 
         def gradient_fn(backpropagation):
 
-            if op == '+':
-                grad_left, grad_right = np.ones_like(left.value_fn()), np.ones_like(right.value_fn())
-            elif op == '-':
-                grad_left, grad_right = np.ones_like(left.value_fn()), -np.ones_like(right.value_fn())
-            elif op == '*':
-                grad_left, grad_right = right.value_fn(), left.value_fn()
-            elif op == '/':
-                grad_left, grad_right = 1 / right.value_fn(), - left.value_fn() / right.value_fn() ** 2
-            elif op == '@':
-                grad_left, grad_right = right.value_fn(), left.value_fn()
-            elif op == '**':
-                grad_left = left.value_fn() ** (right.value_fn() - 1) * right.value_fn()
-                grad_right = left.value_fn() ** right.value_fn() * np.log(left.value_fn())
-            else:
-                raise NotImplementedError
+            grad_left, grad_right = OPERATIONS['binary'][op][1](left.value_fn(), right.value_fn())
 
             if op == '@':
-                grad_left = np.matmul(backpropagation, right.value_fn().T)
-                grad_right = np.matmul(left.value_fn().T, backpropagation)
+                grad_left = np.matmul(backpropagation, grad_left)
+                grad_right = np.matmul(grad_right, backpropagation)
             else:
                 grad_left *= backpropagation
                 grad_right *= backpropagation
@@ -482,7 +368,7 @@ class Einsum(Node):
 
             return tuple((operand, partial_derivative(operand, backpropagation)) for operand in self.operands)
 
-        operands_str = ", ".join([str(operand) for operand in self.operands])
+        operands_str = ", ".join(str(operand) for operand in self.operands)
         name = name if name is not None else f"einsum(subscripts='{self.subscripts}', {operands_str})"
         super().__init__(name=name, operation="einsum", operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
@@ -493,18 +379,17 @@ class Einsum(Node):
         if len(self.operands) + 1 != len(self.subscripts_list):
             raise ValueError("Number of operands doesn't match the einsum string!")
 
-        for operand, op_letters in zip(self.operands, self.subscripts_list[:-1]):
-            if len(operand.shape) != 0 and len(operand.shape) != len(op_letters) and "..." not in op_letters and op_letters != "":
-                raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{op_letters}'")
+        for operand, operand_subscripts in zip(self.operands, self.subscripts_list[:-1]):
+            if len(operand.shape) != 0 and len(operand.shape) != len(operand_subscripts) and "..." not in operand_subscripts and operand_subscripts != "":
+                raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{operand_subscripts}'")
 
-            shp = operand.shape
-            if op_letters[:3] == "...":
-                op_letters = op_letters[::-1]
-                shp = shp[::-1]
+            operand_shape = operand.shape
+            if operand_subscripts[:3] == "...":
+                operand_subscripts, operand_shape = operand_subscripts[::-1], operand_shape[::-1]
 
-            for i, letter in enumerate(re.findall(r'\.{3}|\S', op_letters)):
-                if i < len(shp):
-                    dim = shp[i] if len(letter) == 1 else shp[i:]
+            for i, letter in enumerate(re.findall(r'\.{3}|\S', operand_subscripts)):
+                if i < len(operand_shape):
+                    dim = operand_shape[i] if len(letter) == 1 else operand_shape[i:]
                     if self.subscript_to_dim.get(letter, dim) != dim:
                         raise ValueError("Inconsistent dimension names!")
                     self.subscript_to_dim[letter] = dim
@@ -512,84 +397,24 @@ class Einsum(Node):
         self._shape = tuple(self.subscript_to_dim.get(letter, 0) for letter in self.subscripts_list[-1])
 
 
-def exp(variable):
-    return variable.exp() if isinstance(variable, Variable) else np.exp(variable)
-
-
-def log(variable):
-    return variable.log() if isinstance(variable, Variable) else np.log(variable)
-
-
-def log10(variable):
-    return variable.log10() if isinstance(variable, Variable) else np.log10(variable)
-
-
-def sin(variable):
-    return variable.sin() if isinstance(variable, Variable) else np.sin(variable)
-
-
-def cos(variable):
-    return variable.cos() if isinstance(variable, Variable) else np.cos(variable)
-
-
-def tan(variable):
-    return variable.tan() if isinstance(variable, Variable) else np.tan(variable)
-
-
-def sinh(variable):
-    return variable.sinh() if isinstance(variable, Variable) else np.sinh(variable)
-
-
-def cosh(variable):
-    return variable.cosh() if isinstance(variable, Variable) else np.cosh(variable)
-
-
-def tanh(variable):
-    return variable.tanh() if isinstance(variable, Variable) else np.tanh(variable)
-
-
-def acos(variable):
-    return variable.acos() if isinstance(variable, Variable) else np.arccos(variable)
-
-
-def acosh(variable):
-    return variable.acosh() if isinstance(variable, Variable) else np.arccosh(variable)
-
-
-def asin(variable):
-    return variable.asin() if isinstance(variable, Variable) else np.arcsin(variable)
-
-
-def asinh(variable):
-    return variable.asinh() if isinstance(variable, Variable) else np.arcsinh(variable)
-
-
-def atan(variable):
-    return variable.atan() if isinstance(variable, Variable) else np.arctan(variable)
-
-
-def atanh(variable):
-    return variable.atanh() if isinstance(variable, Variable) else np.arctanh(variable)
-
-
-def sqrt(variable):
-    return variable.sqrt() if isinstance(variable, Variable) else np.sqrt(variable)
-
-
-def cbrt(variable):
-    return variable.cbrt() if isinstance(variable, Variable) else np.cbrt(variable)
-
-
-def erf(variable):
-    return variable.erf() if isinstance(variable, Variable) else np.vectorize(math.erf)(variable)
-
-
-def erfc(variable):
-    return variable.erfc() if isinstance(variable, Variable) else np.vectorize(math.erfc)(variable)
-
-
 def einsum(subscripts, *operands):
     return Einsum(subscripts, *operands)
+
+
+for key in OPERATIONS['unary'].keys():
+    if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
+        func = partial(Node.unary_operation, op=key)
+        setattr(Variable, key, func)
+        globals()[key] = func
+
+for key in OPERATIONS['binary'].keys():
+    if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
+        func = partial(Node.binary_operation, op=key)
+        setattr(Variable, key, func)
+        globals()[key] = func
+
+__all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos',
+           'cos', 'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh']
 
 
 # Example usage
