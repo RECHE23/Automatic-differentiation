@@ -6,6 +6,7 @@ from functools import reduce, partial
 from typing import List, Optional, Set, SupportsFloat, Callable, Tuple, Dict
 
 import numpy as np
+from opt_einsum import contract, parser
 
 # This allows the declaration of the functions in OPERATIONS at runtime:
 global erf, neg, erfc, sinh, asin, log10, log, atan, sin, asinh, acos, cos, sqrt, acosh, abs, tan, cosh, tanh, exp, cbrt, atanh
@@ -580,11 +581,13 @@ class Einsum(Node):
         self.subscripts_list = re.split(r',|->', self.subscripts)
         self.subscript_to_dim = {}
 
-        self._validate_operands()
-
         def value_fn() -> np.ndarray:
             operands_list = [operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands]
-            return np.einsum(self.subscripts, *operands_list, optimize=True)
+            self.subscripts = "->".join(parser.parse_einsum_input((subscripts, *operands_list))[:2])
+            self.subscripts_list = re.split(r',|->', self.subscripts)
+
+            self._validate_operands()
+            return contract(self.subscripts, *operands_list, optimize='optimal')
 
         def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
 
@@ -614,7 +617,7 @@ class Einsum(Node):
 
                 # Construct the subscripts string for the new einsum operation:
                 subscripts_ = ",".join(subscripts_list[:-1]) + "->" + subscripts_list[-1]
-                return np.einsum(subscripts_, *operands_list[:-1])
+                return contract(subscripts_, *operands_list[:-1], optimize='optimal')
 
             return tuple((operand, partial_derivative(operand, backpropagation)) for operand in self.operands)
 
@@ -632,7 +635,7 @@ class Einsum(Node):
         for operand, operand_subscripts in zip(self.operands, self.subscripts_list[:-1]):
             if all((len(operand.shape), len(operand.shape) != len(operand_subscripts),
                     "..." not in operand_subscripts, operand_subscripts)):
-                raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{operand_subscripts}'")
+                raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{operand_subscripts}', subscripts: '{self.subscripts}'")
 
             operand_shape = operand.shape
             if operand_subscripts[:3] == "...":
