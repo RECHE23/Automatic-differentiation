@@ -601,20 +601,20 @@ class Einsum(Node):
                 order[location], order[-1] = order[-1], order[location]
 
                 # Reorder the operands and subscripts according to the computed order:
-                operands_with_grad = list(np.array(list(self.operands) + [previous_grad], dtype=object)[order])
-                opnames = list(np.array(self.subscripts_list)[order])
+                operands_list = [operand.value for operand in self.operands] + [previous_grad]
+                operands_list = [operands_list[i] for i in order]
+                subscripts_list = [self.subscripts_list[i] for i in order]
 
                 # Handle ellipsis (multiple dimensions) in the einsum subscripts:
                 for i, letter in enumerate(re.findall(r'\.{3}|\S', self.subscripts_list[location])):
-                    if letter not in re.findall(r'\.{3}|\S', "".join(opnames[:-1])):
-                        opnames.insert(0, letter)
+                    if letter not in re.findall(r'\.{3}|\S', "".join(subscripts_list[:-1])):
+                        subscripts_list.insert(0, letter)
                         dim = wrt.shape[i]
-                        var_to_insert = self._ensure_is_a_variable(np.ones(dim))
-                        operands_with_grad.insert(0, var_to_insert)
+                        operands_list.insert(0, np.ones(dim))
 
                 # Construct the subscripts string for the new einsum operation:
-                subscripts_ = ",".join(opnames[:-1]) + "->" + opnames[-1]
-                return Einsum(subscripts_, *operands_with_grad[:-1]).value_fn()
+                subscripts_ = ",".join(subscripts_list[:-1]) + "->" + subscripts_list[-1]
+                return np.einsum(subscripts_, *operands_list[:-1])
 
             return tuple((operand, partial_derivative(operand, backpropagation)) for operand in self.operands)
 
