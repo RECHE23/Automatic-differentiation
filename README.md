@@ -1,23 +1,63 @@
 # Automatic Differentiation
 
-This Python project provides a simple implementation of automatic differentiation using the `Variable` class. Automatic differentiation (AD) is a technique widely used in machine learning and scientific computing to compute gradients of mathematical functions efficiently. This project aims to demonstrate AD principles in a clear and concise manner.
+This Python project provides a simple implementation of automatic differentiation.
+
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Features](#features)
+- [Contributing](#contributing)
+- [License](#license)
+- [Author](#author)
+
+## Introduction
+
+Automatic differentiation (AD) is a technique widely used in machine learning and scientific computing to compute gradients of mathematical functions efficiently. This project aims to demonstrate AD principles in a clear and concise manner.
+
+## Installation
+
+To explore and experiment with this framework, follow these steps:
+
+1. Clone this repository to your local machine:
+
+```bash
+git clone https://github.com/RECHE23/Automatic-differentiation.git
+```
+
+2. Navigate to the project directory:
+```bash
+cd Automatic-differentiation
+```
+
+3. Set up a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows, use "venv\Scripts\activate".
+```
+4. Install the required packages:
+```
+pip install -r requirements.txt
+```
 
 ## Features
 
-- Supports basic arithmetic operations (addition, negation, subtraction, multiplication, division and exponentiation).
-- Supports mathematical functions like `sin`, `cos`, `tan`, `exp` and `sqrt`.
-- Builds a computational graphs of calculations and computes evaluation and gradients of composite functions on demand.
+- Supports basic arithmetic operations (addition, negation, subtraction, multiplication, division, and exponentiation).
+- Supports trigonometric functions like `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`, `tanh`, and more.
+- Provides differentiable versions of functions like `sqrt`, `cbrt`, `exp`, `log`, `log10`, `abs`, `erf`, `erfc`, and more.
+- Supports matrix operations and provides differentiable versions of matrix operations like `einsum`.
+- Builds a computational graph of calculations and computes evaluation and gradients of composite functions on demand.
+- Allows easy management of variables and their values using the `Variable` class and `set_variables`.
 
-## Example
+## Usage
 
 Here's a simple example of how you can use this project:
 
 ```python
-from automatic_differentiation import Variable, exp
+from automatic_differentiation import set_variables, exp
 
-x = Variable('x')
-y = Variable('y')
-z = Variable('z')
+x, y, z = set_variables('x', 'y', 'z')
 
 formula = exp((x + y) * (x - y) / (x ** z))
 print(f"f(x, y, z) = {formula}")                               # Displays the formula
