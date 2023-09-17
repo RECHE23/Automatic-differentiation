@@ -414,7 +414,7 @@ for key in OPERATIONS['binary'].keys():
         globals()[key] = func
 
 __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos',
-           'cos', 'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh']
+           'cos', 'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum']
 
 
 # Example usage

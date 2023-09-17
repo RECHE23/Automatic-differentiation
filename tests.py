@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, exp, log, log10, sqrt, cbrt, erf, erfc
+from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, exp, log, log10, sqrt, cbrt, \
+    erf, erfc, einsum
 
 
 class TestVariable(unittest.TestCase):
@@ -728,7 +729,7 @@ class TestNumpyArrayOperations(unittest.TestCase):
         expected_result = np.array([5.0, 7.0, 9.0])
         np.testing.assert_array_equal(result, expected_result)
 
-        grads = formula.compute_gradients()
+        grads = formula.grads
         self.assertTrue(np.array_equal(grads[x], np.array([1.0, 1.0, 1.0])))
         self.assertTrue(np.array_equal(grads[y], np.array([1.0, 1.0, 1.0])))
 
@@ -743,7 +744,7 @@ class TestNumpyArrayOperations(unittest.TestCase):
         result = formula.evaluate_at(x=x_val, y=y_val)
         np.testing.assert_array_equal(result, np.array([-3.0, -3.0, -3.0]))
 
-        grads = formula.compute_gradients()
+        grads = formula.grads
         self.assertTrue(np.array_equal(grads[x], np.array([1.0, 1.0, 1.0])))
         self.assertTrue(np.array_equal(grads[y], np.array([-1.0, -1.0, -1.0])))
 
@@ -758,7 +759,7 @@ class TestNumpyArrayOperations(unittest.TestCase):
         result = formula.evaluate_at(x=x_val, y=y_val)
         np.testing.assert_array_equal(result, np.array([4.0, 10.0, 18.0]))
 
-        grads = formula.compute_gradients()
+        grads = formula.grads
         self.assertTrue(np.array_equal(grads[x], np.array([4.0, 5.0, 6.0])))
         self.assertTrue(np.array_equal(grads[y], np.array([1.0, 2.0, 3.0])))
 
@@ -771,11 +772,11 @@ class TestNumpyArrayOperations(unittest.TestCase):
         y_val = np.array([4.0, 5.0, 6.0])
 
         result = formula.evaluate_at(x=x_val, y=y_val)
-        np.testing.assert_array_equal(result, np.array([1/4, 2/5, 1/2]))
+        np.testing.assert_array_equal(result, np.array([1 / 4, 2 / 5, 1 / 2]))
 
-        grads = formula.compute_gradients()
-        self.assertTrue(np.array_equal(grads[x], np.array([1/4, 1/5, 1/6])))
-        self.assertTrue(np.array_equal(grads[y], np.array([-1/16, -2/25, -1/12])))
+        grads = formula.grads
+        self.assertTrue(np.array_equal(grads[x], np.array([1 / 4, 1 / 5, 1 / 6])))
+        self.assertTrue(np.array_equal(grads[y], np.array([-1 / 16, -2 / 25, -1 / 12])))
 
     def test_array_exponentiation(self):
         x = Variable('x')
@@ -788,7 +789,7 @@ class TestNumpyArrayOperations(unittest.TestCase):
         result = formula.evaluate_at(x=x_val, y=y_val)
         np.testing.assert_array_equal(result, np.array([4.0, 27.0, 256.0]))
 
-        grads = formula.compute_gradients()
+        grads = formula.grads
         self.assertTrue(np.allclose(grads[x], y_val * (x_val ** (y_val - 1))))
         self.assertTrue(np.allclose(grads[y], (x_val ** y_val) * np.log(x_val)))
 
@@ -802,7 +803,7 @@ class TestNumpyArrayOperations(unittest.TestCase):
         expected_result = np.sin(x_val)
         np.testing.assert_allclose(result, expected_result)
 
-        grads = formula.compute_gradients()
+        grads = formula.grads
         self.assertTrue(np.allclose(grads[x], np.array([1.0, 0.0, -1.0])))
 
     def test_exp(self):
@@ -814,8 +815,189 @@ class TestNumpyArrayOperations(unittest.TestCase):
         result = formula.evaluate_at(x=x_val)
         np.testing.assert_allclose(result, np.array([1.0, 2.718281828459045, 7.389056098930650]))
 
-        grads = formula.compute_gradients()
+        grads = formula.grads
         self.assertTrue(np.array_equal(grads[x], np.array([1.0, 2.718281828459045, 7.389056098930650])))
+
+    def test_matmul_operation1(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = x @ y
+
+        x_val = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y_val = np.array([[2.0], [1.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[4.0], [10.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[2.0, 1.0], [2.0, 1.0]])
+        expected_grad_y = np.array([[4.0], [6.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_matmul_operation2(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = x @ y
+
+        x_val = np.array([[1.0, 2.0, 5.0], [5.0, 3.0, 4.0], [7.0, 3.0, 11.0]])
+        y_val = np.array([[2.0], [5.0], [1.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[17.0], [29.0], [40.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[2.0, 5.0, 1.0], [2.0, 5.0, 1.0], [2.0, 5.0, 1.0]])
+        expected_grad_y = np.array([[13.0], [8.0], [20.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_matmul_operation3(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = x @ y
+
+        x_val = np.array([[1.0, 2.0, 5.0], [5.0, 3.0, 4.0], [7.0, 3.0, 11.0]])
+        y_val = np.array([[3.0, 5.0, 11.0], [2.0, 7.0, 4.0], [7.0, 2.0, 10.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[42.0, 29.0, 69.0], [49.0, 54.0, 107.0], [104.0, 78.0, 199.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[19.0, 13.0, 19.0], [19.0, 13.0, 19.0], [19.0, 13.0, 19.0]])
+        expected_grad_y = np.array([[13.0, 13.0, 13.0], [8.0, 8.0, 8.0], [20.0, 20.0, 20.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_matmul_operation4(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = x @ y
+
+        x_val = np.array([[1.0, -2.0, 5.0], [5.0, 3.0, -4.0], [7.0, 3.0, 11.0]])
+        y_val = np.array([[3.0, 5.0, -11.0], [2.0, -7.0, 4.0], [7.0, 2.0, -10.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[34.0, 29.0, -69.0], [-7.0, -4.0, -3.0], [104.0, 36.0, -175.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[-3.0, -1.0, -1.0], [-3.0, -1.0, -1.0], [-3.0, -1.0, -1.0]])
+        expected_grad_y = np.array([[13.0, 13.0, 13.0], [4.0, 4.0, 4.0], [12.0, 12.0, 12.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation1(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('ij, kl -> k', x, y)
+
+        x_val = np.array([[1.0, -2.0, 5.0], [5.0, 3.0, -4.0], [7.0, 3.0, 11.0]])
+        y_val = np.array([[3.0, 5.0, -11.0], [2.0, -7.0, 4.0], [7.0, 2.0, -10.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([-87.0, -29.0, -29.0])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[-5.0, -5.0, -5.0], [-5.0, -5.0, -5.0], [-5.0, -5.0, -5.0]])
+        expected_grad_y = np.array([[29.0, 29.0, 29.0], [29.0, 29.0, 29.0], [29.0, 29.0, 29.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation2(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        formula = einsum('ij, kl, k -> k', x, y, z)
+
+        x_val = np.array([[1.0, -2.0, 5.0], [5.0, 3.0, -4.0], [7.0, 3.0, 11.0]])
+        y_val = np.array([[3.0, 5.0, -11.0], [2.0, -7.0, 4.0], [7.0, 2.0, -10.0]])
+        z_val = np.array([3.0, 5.0, -10.0])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
+        expected_result = np.array([-261.0, -145.0, 290.0])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[-4.0, -4.0, -4.0], [-4.0, -4.0, -4.0], [-4.0, -4.0, -4.0]])
+        expected_grad_y = np.array([[87.0, 87.0, 87.0], [145.0, 145.0, 145.0], [-290.0, -290.0, -290.0]])
+        expected_grad_z = np.array([-87.0, -29.0, -29.0])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+
+    def test_einsum_operation3(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('ij, jk -> ik', x, y)
+
+        x_val = np.array([[1.0, -2.0, 5.0], [5.0, 3.0, -4.0], [7.0, 3.0, 11.0]])
+        y_val = np.array([[3.0, 2.0, 7.0], [5.0, -7.0, 2.0], [-11.0, 4.0, -10.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[-62.0, 36.0, -47.0], [74.0, -27.0, 81.0], [-85.0, 37.0, -55.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[12., 0., -17.], [12., 0., -17.], [12., 0., -17.]])
+        expected_grad_y = np.array([[13., 13., 13.], [4., 4., 4.], [12., 12., 12.]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation4(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        formula = einsum('ij, kl, mn -> mnij', x, y, z)
+
+        x_val = np.array([[1.0, -2.0], [5.0, 3.0]])
+        y_val = np.array([[3.0, 2.0], [-7.0, 4.0]])
+        z_val = np.array([[1.0, 0.0], [0.0, -1.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
+        expected_result = np.array([[[[2.0, -4.0],
+                                      [10.0, 6.0]],
+                                     [[0.0, 0.0],
+                                      [0.0, 0.0]]],
+                                    [[[0.0, 0.0],
+                                      [0.0, 0.0]],
+                                     [[-2.0, 4.0],
+                                      [-10.0, -6.0]]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[0.0, 0.0], [0.0, 0.0]])
+        expected_grad_y = np.array([[0.0, 0.0], [0.0, 0.0]])
+        expected_grad_z = np.array([[14.0, 14.0], [14.0, 14.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+
+    def test_complex_expression(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        formula = (x ** 2 + y ** 3) * z - einsum('ij, jk -> ik', x, y)
+
+        x_val = np.array([[5.0, 2.0], [3.0, 4.0]])
+        y_val = np.array([[2.0, 6.0], [9.0, 5.0]])
+        z_val = np.array([[2.0, 7.0], [5.0, 2.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
+        expected_result = np.array([[38.0, 1500.0], [3648.0, 244.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[12.0, 14.0], [22.0, 2.0]])
+        expected_grad_y = np.array([[16.0, 748.0], [1209.0, 144.0]])
+        expected_grad_z = np.array([[33.0, 220.0], [738.0, 141.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
 
 
 if __name__ == '__main__':
