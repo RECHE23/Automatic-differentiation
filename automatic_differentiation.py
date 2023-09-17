@@ -330,6 +330,8 @@ class Variable:
 
             for k, v in variable_assignments.items():
                 k.value = v
+        if isinstance(self, Node):
+            self._validate_operands()
 
     @staticmethod
     def _ensure_is_a_variable(other: Variable | np.ndarray | SupportsFloat):
@@ -391,10 +393,6 @@ class Node(Variable):
 
         self._validate_operands()
 
-    def _apply_variable_assignments(self, variable_assignments: Dict[Variable | str, float | np.ndarray]) -> None:
-        super()._apply_variable_assignments(variable_assignments)
-        self._validate_operands()
-
     def _validate_operands(self) -> None:
         n = len(self.operands)
 
@@ -434,7 +432,7 @@ class Node(Variable):
     @staticmethod
     def unary_operation(
             item: Variable | np.ndarray | SupportsFloat,
-            op: str
+            operation: str
     ) -> Node:
         """
         Perform a unary operation on a variable or constant.
@@ -443,7 +441,7 @@ class Node(Variable):
         ----------
         item : Variable | np.ndarray | SupportsFloat
             The input variable, constant, or value.
-        op : str
+        operation : str
             The unary operation to perform.
 
         Returns
@@ -460,30 +458,30 @@ class Node(Variable):
         --------
         Node : Represents a node in the computation graph.
         """
-        assert op in OPERATIONS['unary'], f"Unsupported unary operation: {op}"
+        assert operation in OPERATIONS['unary'], f"Unsupported unary operation: {operation}"
 
         item = Variable._ensure_is_a_variable(item)
         operands = (item,)
-        if op == 'neg':
-            item_name = Node._apply_parenthesis_if_needed(item, op)
+        if operation == 'neg':
+            item_name = Node._apply_parenthesis_if_needed(item, operation)
             name = f"-{item_name}"
         else:
-            name = f"{op}({item.name})"
+            name = f"{operation}({item.name})"
 
         def value_fn() -> float | np.ndarray:
-            return OPERATIONS['unary'][op][0](item.value_fn())
+            return OPERATIONS['unary'][operation][0](item.value_fn())
 
         def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, float | np.ndarray], ...]:
-            grad = OPERATIONS['unary'][op][1](item.value_fn()) * backpropagation
+            grad = OPERATIONS['unary'][operation][1](item.value_fn()) * backpropagation
             return (item, grad),
 
-        return Node(name=name, operation=op, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
     def binary_operation(
             left: Variable | np.ndarray | SupportsFloat,
             right: Variable | SupportsFloat,
-            op: str
+            operation: str
     ) -> Node:
         """
         Perform a binary operation on two variables, constants, or values.
@@ -494,7 +492,7 @@ class Node(Variable):
             The left operand.
         right : Variable | SupportsFloat
             The right operand.
-        op : str
+        operation : str
             The binary operation to perform.
 
         Returns
@@ -511,23 +509,23 @@ class Node(Variable):
         --------
         Node : Represents a node in the computation graph.
         """
-        assert op in OPERATIONS['binary'], f"Unsupported binary operation: {op}"
+        assert operation in OPERATIONS['binary'], f"Unsupported binary operation: {operation}"
 
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
         operands = (left, right)
-        left_name = Node._apply_parenthesis_if_needed(left, op)
-        right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
-        name = f"{left_name} {op} {right_name}"
+        left_name = Node._apply_parenthesis_if_needed(left, operation)
+        right_name = Node._apply_parenthesis_if_needed(right, operation, right=True)
+        name = f"{left_name} {operation} {right_name}"
 
         def value_fn() -> float | np.ndarray:
-            return OPERATIONS['binary'][op][0](left.value_fn(), right.value_fn())
+            return OPERATIONS['binary'][operation][0](left.value_fn(), right.value_fn())
 
         def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, float | np.ndarray], ...]:
 
-            grad_left, grad_right = OPERATIONS['binary'][op][1](left.value_fn(), right.value_fn())
+            grad_left, grad_right = OPERATIONS['binary'][operation][1](left.value_fn(), right.value_fn())
 
-            if op == '@':
+            if operation == '@':
                 grad_left = np.matmul(backpropagation, grad_left)
                 grad_right = np.matmul(grad_right, backpropagation)
             else:
@@ -536,7 +534,7 @@ class Node(Variable):
 
             return (left, grad_left), (right, grad_right)
 
-        return Node(name=name, operation=op, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
+        return Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
 
 class Einsum(Node):
@@ -580,16 +578,22 @@ class Einsum(Node):
         def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
 
             def partial_derivative(wrt: Variable, previous_grad: np.ndarray) -> np.ndarray:
+                """ Compute the partial derivative of the einsum operation with respect to a specific variable. """
                 if wrt not in self.operands:
                     return np.zeros_like(wrt.value)
 
+                # Determine the location of the variable in the operands:
                 location = self.operands.index(wrt)
+
+                # Define the order of operands and subscripts to correctly perform the einsum:
                 order = list(range(len(self.subscripts_list)))
                 order[location], order[-1] = order[-1], order[location]
 
+                # Reorder the operands and subscripts according to the computed order:
                 operands_with_grad = list(np.array(list(self.operands) + [previous_grad], dtype=object)[order])
                 opnames = list(np.array(self.subscripts_list)[order])
 
+                # Handle ellipsis (multiple dimensions) in the einsum subscripts:
                 for i, letter in enumerate(re.findall(r'\.{3}|\S', self.subscripts_list[location])):
                     if letter not in re.findall(r'\.{3}|\S', "".join(opnames[:-1])):
                         opnames.insert(0, letter)
@@ -597,6 +601,7 @@ class Einsum(Node):
                         var_to_insert = self._ensure_is_a_variable(np.ones(dim))
                         operands_with_grad.insert(0, var_to_insert)
 
+                # Construct the subscripts string for the new einsum operation:
                 subscripts_ = ",".join(opnames[:-1]) + "->" + opnames[-1]
                 return Einsum(subscripts_, *operands_with_grad[:-1]).value_fn()
 
@@ -706,12 +711,12 @@ def set_variables(*names: str) -> Tuple[Variable, ...]:
 # Declaration of the unary mathematical functions at runtime:
 for key in OPERATIONS['unary'].keys():
     if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
-        globals()[key] = partial(Node.unary_operation, op=key)
+        globals()[key] = partial(Node.unary_operation, operation=key)
 
 # Declaration of the binary mathematical functions at runtime:
 for key in OPERATIONS['binary'].keys():
     if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
-        globals()[key] = partial(Node.binary_operation, op=key)
+        globals()[key] = partial(Node.binary_operation, operation=key)
 
 # A list of all the symbols in this module:
 __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos', 'cos',
@@ -719,7 +724,7 @@ __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 
            'set_variables']
 
 
-# Example usage
+# Example usage:
 if __name__ == "__main__":
 
     print("Example 1: Floating point variables.")
