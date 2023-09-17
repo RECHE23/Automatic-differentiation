@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import random
 import re
 from functools import reduce, partial
 from typing import List, Optional, Set, SupportsFloat, Callable, Tuple, Dict
@@ -145,7 +144,7 @@ class Variable:
         self._value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn if gradient_fn is not None else lambda backpropagation: []
-        self.id = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(16))
+        self.id = f"var_{id(self):x}"
 
     def __repr__(self) -> str:
         value_txt = f", value={self.value}" if self.value is not None else ""
@@ -172,8 +171,8 @@ class Variable:
     @property
     def graph(self) -> str:
         return f"digraph {{\n" \
-               f"labelloc=\"t\"" \
-               f"label=\"Evaluation graph\"" \
+               f"  labelloc=\"t\"\n" \
+               f"  label=\"Evaluation graph\"\n" \
                f"{self._graph}}}"
 
     @property
@@ -181,6 +180,18 @@ class Variable:
         if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'shape'):
             return self.value.shape
         return self._shape if hasattr(self, '_shape') else ()
+
+    @property
+    def ndim(self) -> int:
+        if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'ndim'):
+            return self.value.ndim
+        return self._ndim if hasattr(self, '_ndim') else 1
+
+    @property
+    def size(self) -> int:
+        if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'size'):
+            return self.value.size
+        return self._size if hasattr(self, '_size') else 1
 
     @property
     def value(self) -> Optional[float | np.ndarray]:
