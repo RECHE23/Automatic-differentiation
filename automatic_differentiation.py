@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import List, Optional, Set, Union, SupportsFloat, Callable, Tuple, Dict
-from functools import reduce, partial
-import re
-import math
-import numpy as np
-import random
 
+import math
+import random
+import re
+from functools import reduce, partial
+from typing import List, Optional, Set, SupportsFloat, Callable, Tuple, Dict
+
+import numpy as np
 
 OPERATIONS = {
     'unary': {
@@ -79,11 +80,11 @@ class Variable:
     ----------
     name : str
         The name of the variable.
-    value : Union[float, np.ndarray], optional
+    value : float | np.ndarray, optional
         The initial value of the variable, by default None.
-    value_fn : Callable[[], Union[float, np.ndarray]], optional
+    value_fn : Callable[[], float | np.ndarray], optional
         A function that computes the value of the variable, by default None.
-    gradient_fn : Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]], optional
+    gradient_fn : Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]], optional
         A function that computes gradients, by default None.
 
     Attributes
@@ -126,19 +127,19 @@ class Variable:
     """
     variables: Set[Variable]
     name: str
-    value_fn: Callable[[], Union[float, np.ndarray]]
-    gradient_fn: Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]]
+    value_fn: Callable[[], float | np.ndarray]
+    gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]]
     id: str
 
-    def __init__(self, name: str, value: Union[float, np.ndarray] = None,
-                 value_fn: Callable[[], Union[float, np.ndarray]] = None,
-                 gradient_fn: Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = None):
+    def __init__(self, name: str, value: float | np.ndarray = None,
+                 value_fn: Callable[[], float | np.ndarray] = None,
+                 gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]] = None):
         self.variables = {self}
         self.name = name
         self._value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn if gradient_fn is not None else lambda backpropagation: []
-        self.id = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for i in range(16))
+        self.id = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(16))
 
     def __repr__(self) -> str:
         value_txt = f", value={self.value}" if self.value is not None else ""
@@ -176,7 +177,7 @@ class Variable:
         return self._shape if hasattr(self, '_shape') else ()
 
     @property
-    def value(self) -> Optional[Union[float, np.ndarray]]:
+    def value(self) -> Optional[float | np.ndarray]:
         if self._value is None:
             return None
         if isinstance(self._value, np.ndarray):
@@ -184,50 +185,51 @@ class Variable:
         return float(self._value)
 
     @value.setter
-    def value(self, value: Union[float, np.ndarray]) -> None:
+    def value(self, value: float | np.ndarray) -> None:
         self._value = value
         if isinstance(value, np.ndarray):
             self._shape = value.shape
 
     @property
     def grads(self) -> Dict[Variable, float]:
-        assert all(v.value is not None for v in self.variables), "An evaluation of the formula must be done before trying to read the grads."
+        assert all(v.value is not None for v in self.variables),\
+            "An evaluation of the formula must be done before trying to read the grads."
         return self.compute_gradients()
 
-    def __add__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __add__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, "+")
 
-    def __radd__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __radd__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, "+")
 
-    def __sub__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __sub__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, "-")
 
-    def __rsub__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __rsub__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, "-")
 
-    def __mul__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __mul__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, "*")
 
-    def __rmul__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __rmul__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, "*")
 
-    def __truediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __truediv__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, "/")
 
-    def __rtruediv__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __rtruediv__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, "/")
 
-    def __matmul__(self, other: Union[Variable, np.ndarray]) -> Node:
+    def __matmul__(self, other: Variable | np.ndarray) -> Node:
         return Node.binary_operation(self, other, "@")
 
-    def __rmatmul__(self, other: Union[Variable, np.ndarray]) -> Node:
+    def __rmatmul__(self, other: Variable | np.ndarray) -> Node:
         return Node.binary_operation(other, self, "@")
 
-    def __pow__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __pow__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, "**")
 
-    def __rpow__(self, other: Union[Variable, SupportsFloat]) -> Node:
+    def __rpow__(self, other: Variable | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, "**")
 
     def __neg__(self) -> Node:
@@ -236,13 +238,13 @@ class Variable:
     def __abs__(self) -> Node:
         return Node.unary_operation(self, "abs")
 
-    def evaluate_at(self, **variable_assignments: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    def evaluate_at(self, **variable_assignments: float | np.ndarray) -> float | np.ndarray:
         self._apply_variable_assignments(variable_assignments)
         self.value = self.value_fn()
         return self.value
 
-    def compute_gradients(self, variable_assignments: Dict[Variable, Union[float, np.ndarray]] = None,
-                          backpropagation: Union[float, np.ndarray] = None) -> Dict[Variable, Union[float, np.ndarray]]:
+    def compute_gradients(self, variable_assignments: Dict[Variable, float | np.ndarray] = None,
+                          backpropagation: float | np.ndarray = None) -> Dict[Variable, float | np.ndarray]:
         self._apply_variable_assignments(variable_assignments)
 
         if backpropagation is None:
@@ -254,13 +256,13 @@ class Variable:
             {self: backpropagation}
         )
 
-    def _apply_variable_assignments(self, variable_assignments: Dict[Union[Variable, str], Union[float, np.ndarray]]) -> None:
+    def _apply_variable_assignments(self, variable_assignments: Dict[Variable | str, float | np.ndarray]) -> None:
         if variable_assignments is not None:
             if all(isinstance(k, Variable) for k in variable_assignments.keys()):
-                # The dictionary is of type Dict[Variable, Union[float, np.ndarray]]:
+                # The dictionary is of type Dict[Variable, float | np.ndarray]:
                 assert all(v.name in variable_assignments for v in self.variables)
             else:
-                # The dictionary is of type Dict[str, Union[float, np.ndarray]]:
+                # The dictionary is of type Dict[str, float | np.ndarray]:
                 assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
                 variable_assignments = {v: variable_assignments[v.name] for v in self.variables}
 
@@ -268,7 +270,7 @@ class Variable:
                 k.value = v
 
     @staticmethod
-    def _ensure_is_a_variable(other: Union[Variable, np.ndarray, SupportsFloat]):
+    def _ensure_is_a_variable(other: Variable | np.ndarray | SupportsFloat):
         return other if isinstance(other, Variable) else Constant(other)
 
 
@@ -278,13 +280,13 @@ class Constant(Variable):
 
     Parameters
     ----------
-    value : Union[float, np.ndarray]
+    value : float | np.ndarray
         The constant value.
     name : str, optional
         The name of the constant, by default None.
     """
 
-    def __init__(self, value: Union[float, np.ndarray], name: str = None):
+    def __init__(self, value: float | np.ndarray, name: str = None):
         if name is None:
             if isinstance(value, np.ndarray):
                 name = value.__class__.__name__
@@ -307,17 +309,19 @@ class Node(Variable):
         The operation performed by the node.
     operands : Tuple[Variable, ...]
         The operands used in the operation.
-    value_fn : Callable[[], Union[float, np.ndarray]], optional
+    value_fn : Callable[[], float | np.ndarray], optional
         A function that computes the value of the node, by default None.
-    gradient_fn : Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]], optional
+    gradient_fn : Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]], optional
         A function that computes gradients, by default None.
     """
     operation: str
     operands: Tuple[Variable, ...]
 
-    def __init__(self, name: str, operation: str, operands: Tuple[Variable, ...],
-                 value_fn: Callable[[], Union[float, np.ndarray]] = None,
-                 gradient_fn: Callable[[Union[float, np.ndarray]], Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]] = lambda: []):
+    def __init__(
+            self, name: str, operation: str, operands: Tuple[Variable, ...],
+            value_fn: Callable[[], float | np.ndarray] = None,
+            gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]] = lambda: []
+    ):
         super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.operation = operation
         self.operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
@@ -325,7 +329,7 @@ class Node(Variable):
 
         self._validate_operands()
 
-    def _apply_variable_assignments(self, variable_assignments: Union[Dict[Union[Variable, str], Union[float, np.ndarray]]]) -> None:
+    def _apply_variable_assignments(self, variable_assignments: Dict[Variable | str, float | np.ndarray]) -> None:
         super()._apply_variable_assignments(variable_assignments)
         self._validate_operands()
 
@@ -340,11 +344,13 @@ class Node(Variable):
             if left.shape and right.shape:
                 if self.operation == '@':
                     if left.shape[1] != right.shape[0]:
-                        raise ValueError(f"Matrix dimensions do not align for matrix multiplication: {left.shape} and {right.shape}.")
+                        raise ValueError(
+                            f"Matrix dimensions do not align for matrix multiplication: {left.shape} and {right.shape}.")
                     self._shape = left.shape[1], right.shape[0]
                 else:
                     if left.shape != right.shape:
-                        raise ValueError(f"Matrix dimensions do not align for itemwise operation: {left.shape} and {right.shape}.")
+                        raise ValueError(
+                            f"Matrix dimensions do not align for itemwise operation: {left.shape} and {right.shape}.")
                     self._shape = right.shape
         else:
             raise NotImplementedError
@@ -364,13 +370,13 @@ class Node(Variable):
         return item.name
 
     @staticmethod
-    def unary_operation(item: Union[Variable, np.ndarray, SupportsFloat], op: str) -> Node:
+    def unary_operation(item: Variable | np.ndarray | SupportsFloat, op: str) -> Node:
         """
         Perform a unary operation on a variable or constant.
 
         Parameters
         ----------
-        item : Union[Variable, np.ndarray, SupportsFloat]
+        item : Variable | np.ndarray | SupportsFloat
             The input variable, constant, or value.
         op : str
             The unary operation to perform.
@@ -399,25 +405,29 @@ class Node(Variable):
         else:
             name = f"{op}({item.name})"
 
-        def value_fn() -> Union[float, np.ndarray]:
+        def value_fn() -> float | np.ndarray:
             return OPERATIONS['unary'][op][0](item.value_fn())
 
-        def gradient_fn(backpropagation: Union[float, np.ndarray]) -> Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]:
+        def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, float | np.ndarray], ...]:
             grad = OPERATIONS['unary'][op][1](item.value_fn()) * backpropagation
             return (item, grad),
 
         return Node(name=name, operation=op, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn)
 
     @staticmethod
-    def binary_operation(left: Union[Variable, np.ndarray, SupportsFloat], right: Union[Variable, SupportsFloat], op: str) -> Node:
+    def binary_operation(
+            left: Variable | np.ndarray | SupportsFloat,
+            right: Variable | SupportsFloat,
+            op: str
+    ) -> Node:
         """
         Perform a binary operation on two variables, constants, or values.
 
         Parameters
         ----------
-        left : Union[Variable, np.ndarray, SupportsFloat]
+        left : Variable | np.ndarray | SupportsFloat
             The left operand.
-        right : Union[Variable, SupportsFloat]
+        right : Variable | SupportsFloat
             The right operand.
         op : str
             The binary operation to perform.
@@ -445,10 +455,10 @@ class Node(Variable):
         right_name = Node._apply_parenthesis_if_needed(right, op, right=True)
         name = f"{left_name} {op} {right_name}"
 
-        def value_fn() -> Union[float, np.ndarray]:
+        def value_fn() -> float | np.ndarray:
             return OPERATIONS['binary'][op][0](left.value_fn(), right.value_fn())
 
-        def gradient_fn(backpropagation: Union[float, np.ndarray]) -> Tuple[Tuple[Variable, Union[float, np.ndarray]], ...]:
+        def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, float | np.ndarray], ...]:
 
             grad_left, grad_right = OPERATIONS['binary'][op][1](left.value_fn(), right.value_fn())
 
@@ -522,8 +532,8 @@ class Einsum(Node):
                         var_to_insert = self._ensure_is_a_variable(np.ones(dim))
                         operands_with_grad.insert(0, var_to_insert)
 
-                subscripts = ",".join(opnames[:-1]) + "->" + opnames[-1]
-                return Einsum(subscripts, *operands_with_grad[:-1]).value_fn()
+                subscripts_ = ",".join(opnames[:-1]) + "->" + opnames[-1]
+                return Einsum(subscripts_, *operands_with_grad[:-1]).value_fn()
 
             return tuple((operand, partial_derivative(operand, backpropagation)) for operand in self.operands)
 
@@ -539,7 +549,8 @@ class Einsum(Node):
             raise ValueError("Number of operands doesn't match the einsum string!")
 
         for operand, operand_subscripts in zip(self.operands, self.subscripts_list[:-1]):
-            if len(operand.shape) != 0 and len(operand.shape) != len(operand_subscripts) and "..." not in operand_subscripts and operand_subscripts != "":
+            if all((len(operand.shape), len(operand.shape) != len(operand_subscripts),
+                    "..." not in operand_subscripts, operand_subscripts)):
                 raise ValueError(f"Dimension of operand {operand} doesn't match the string! Shape: {operand.shape}, string: '{operand_subscripts}'")
 
             operand_shape = operand.shape
@@ -591,9 +602,8 @@ for key in OPERATIONS['binary'].keys():
         setattr(Variable, key, func)
         globals()[key] = func
 
-__all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos',
-           'cos', 'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum']
-
+__all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos', 'cos',
+           'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'Variable']
 
 # Example usage
 if __name__ == "__main__":
@@ -617,7 +627,7 @@ if __name__ == "__main__":
     formula = A @ B
     print(f"f(A, B) = {formula}")
 
-    evaluation = formula.evaluate_at(A=np.diag([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), B=np.ones((10, 5)))
+    evaluation = formula.evaluate_at(A=np.diag(np.arange(10) + 1), B=np.ones((10, 5)))
     print(f"f(A, B) = \n{evaluation}")
 
     grads = formula.grads

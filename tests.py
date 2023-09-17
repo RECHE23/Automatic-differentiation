@@ -1,7 +1,9 @@
 import unittest
+
 import numpy as np
-from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, exp, log, log10, sqrt, cbrt, \
-    erf, erfc, einsum
+
+from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, \
+    exp, log, log10, sqrt, cbrt, erf, erfc, einsum
 
 
 class TestVariable(unittest.TestCase):
