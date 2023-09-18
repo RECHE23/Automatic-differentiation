@@ -147,7 +147,9 @@ class Variable:
         Compute the absolute value of the variable.
     evaluate_at(**variable_assignments)
         Evaluate the variable's value with specific variable assignments.
-    compute_gradients(variable_assignments=None, backpropagation=None)
+    evaluate_gradients_at(**variable_assignments)
+        Evaluate the variable's gradients with specific variable assignments.
+    compute_gradients(backpropagation=None)
         Compute gradients for the variable.
 
     See Also
@@ -314,16 +316,42 @@ class Variable:
         self.value = self.value_fn()
         return self.value
 
-    def compute_gradients(self, variable_assignments: Dict[Variable, float | np.ndarray] = None,
-                          backpropagation: float | np.ndarray = None) -> Dict[Variable, np.ndarray]:
+    def evaluate_gradients_at(self, **variable_assignments: float | np.ndarray) -> Dict[Variable, np.ndarray]:
+        """
+        Evaluate the gradients of the variable with specific variable assignments.
+
+        Parameters
+        ----------
+        **variable_assignments : float | np.ndarray
+            Keyword arguments where the keys are variable names, and the values are the assigned values.
+
+        Returns
+        -------
+        dict
+            A dictionary where keys are Variable objects, and values are the computed gradients.
+
+        Notes
+        -----
+        This method allows you to evaluate the gradients of the variable with respect to all other variables
+        in the computation graph within a specific context by providing variable assignments as keyword arguments.
+        It computes the gradients by substituting the assigned values for the corresponding variables in its expression.
+
+        Examples
+        --------
+        >>> x, y, z = set_variables('x', 'y', 'z')
+        >>> formula = exp((x + y) * (x - y) / (x ** z))
+        >>> gradients = formula.evaluate_gradients_at(x=2, y=3, z=4)
+        >>> print(gradients[x])
+        """
+        self._apply_variable_assignments(variable_assignments)
+        return self.compute_gradients()
+
+    def compute_gradients(self, backpropagation: float | np.ndarray = None) -> Dict[Variable, np.ndarray]:
         """
         Compute gradients for the variable.
 
         Parameters
         ----------
-        variable_assignments : dict, optional
-            A dictionary where keys are Variable objects or variable names (str), and values are the assigned values.
-            These assignments are used to compute gradients, by default None.
         backpropagation : float | np.ndarray, optional
             The backpropagation value used for gradient computation, by default None.
 
@@ -336,24 +364,14 @@ class Variable:
         -----
         This method computes gradients of the variable with respect to all other variables in the computation graph.
         It allows you to perform backpropagation to compute gradients in a reverse mode.
-
-        Examples
-        --------
-        >>> x, y, z = set_variables('x', 'y', 'z')
-        >>> formula = exp((x + y) * (x - y) / (x ** z))
-        >>> grads = formula.compute_gradients(variable_assignments={'x': 2, 'y': 3, 'z': 4})
-        >>> print(grads[x])  # Gradient with respect to x
-        >>> print(grads[y])  # Gradient with respect to y
-        >>> print(grads[z])  # Gradient with respect to z
         """
-        self._apply_variable_assignments(variable_assignments)
 
         if backpropagation is None:
             backpropagation = np.ones_like(self.value_fn())
 
         return reduce(
             lambda a, b: {k: a.get(k, 0) + b.get(k, 0) for k in set(a) | set(b)},
-            [var.compute_gradients(variable_assignments, backpropagation=val) for var, val in self.gradient_fn(backpropagation)],
+            [var.compute_gradients(backpropagation=val) for var, val in self.gradient_fn(backpropagation)],
             {self: backpropagation}
         )
 
