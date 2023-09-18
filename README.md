@@ -43,11 +43,11 @@ pip install -r requirements.txt
 
 ## Features
 
-- Supports basic arithmetic operations (addition, negation, subtraction, multiplication, division, and exponentiation).
+- Supports basic arithmetic operations (addition, subtraction, multiplication, division, and exponentiation).
 - Supports trigonometric functions like `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`, `tanh`, and more.
-- Provides differentiable versions of functions like `sqrt`, `cbrt`, `exp`, `log`, `log10`, `abs`, `erf`, `erfc`, and more.
-- Supports matrix operations and provides differentiable versions of matrix operations like `einsum`.
-- Builds a computational graph of calculations and computes evaluation and gradients of composite functions on demand.
+- Provides differentiable versions of functions like `sqrt`, `cbrt`, `exp`, `log`, `log10`, `abs`, `erf`, and more.
+- Supports matrix operations and provides differentiable versions of matrix operations like `@` and `einsum`.
+- Builds a computational graph of operations and computes value and gradients of functions on demand.
 - Allows easy management of variables and their values using the `Variable` class and `set_variables`.
 
 ## Usage

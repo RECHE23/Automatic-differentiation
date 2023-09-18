@@ -33,7 +33,9 @@ OPERATIONS = {
         'acosh': (np.arccosh, lambda item, grad: 1.0 / np.sqrt(item.value_fn() ** 2.0 - 1.0) * grad),
         'tanh': (np.tanh, lambda item, grad: 1.0 / np.cosh(item.value_fn()) ** 2.0 * grad),
         'atanh': (np.arctanh, lambda item, grad: 1.0 / (1.0 - item.value_fn() ** 2.0) * grad),
+        # TODO: Handle the case where item.value_fn() <= 0:
         'sqrt': (np.sqrt, lambda item, grad: 0.5 / np.sqrt(item.value_fn()) * grad),
+        # TODO: Handle the case where item.value_fn() <= 0:
         'cbrt': (np.cbrt, lambda item, grad: 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0)) * grad),
         'erf': (np.vectorize(math.erf), lambda item, grad: 2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * grad),
         'erfc': (np.vectorize(math.erfc), lambda item, grad: -2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * grad),
@@ -87,6 +89,7 @@ OPERATIONS = {
         'matmul': 2,
         'add': 3,
         'subtract': 3},
+    # Special representation of operations when not in the format operation(*operands):
     'repr': {
         'power': lambda left, right: f"{left} ** {right}",
         'neg': lambda item: f"-{item}",
@@ -284,6 +287,10 @@ class Variable:
 
     def __abs__(self) -> Node:
         return Node.unary_operation(self, "abs")
+
+    @property
+    def T(self) -> Node:
+        return Node.unary_operation(self, "transpose")
 
     def evaluate_at(self, **variable_assignments: float | np.ndarray) -> float | np.ndarray:
         """
@@ -749,18 +756,18 @@ def set_variables(*names: str) -> Tuple[Variable, ...]:
 
 # Declaration of the unary mathematical functions at runtime:
 for key in OPERATIONS['unary'].keys():
-    if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
-        globals()[key] = partial(Node.unary_operation, operation=key)
+    assert re.match(r'^[a-zA-Z_][\w_]*$', key) is not None, f"Invalid unary operation name: {key}"
+    globals()[key] = partial(Node.unary_operation, operation=key)
 
 # Declaration of the binary mathematical functions at runtime:
 for key in OPERATIONS['binary'].keys():
-    if re.match(r'^[a-zA-Z_][\w_]*$', key) is not None:
-        globals()[key] = partial(Node.binary_operation, operation=key)
+    assert re.match(r'^[a-zA-Z_][\w_]*$', key) is not None, f"Invalid binary operation name: {key}"
+    globals()[key] = partial(Node.binary_operation, operation=key)
 
 # A list of all the symbols in this module:
 __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos', 'cos',
-           'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'Variable',
-           'set_variables', 'transpose']
+           'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'transpose',
+           'Variable', 'set_variables']
 
 
 # Example usage:

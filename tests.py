@@ -396,6 +396,15 @@ class TestOperations(unittest.TestCase):
 
         self.assertAlmostEqual(formula.grads[x], -0.878782578935445, places=12)
 
+    def test_transpose(self):
+        x = Variable('x')
+
+        formula = x.T
+        self.assertEqual(str(formula), "x.T")
+
+        evaluation_result = formula.evaluate_at(x=np.array([[0, 1], [2, 3]]))
+        np.testing.assert_array_equal(evaluation_result, np.array([[0, 2], [1, 3]]))
+
 
 class TestCompositions(unittest.TestCase):
 
