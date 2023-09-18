@@ -163,14 +163,15 @@ class Variable:
     def _graph(self) -> str:
         if isinstance(self, Node):
             shape = "octagon" if isinstance(self, Einsum) else "square"
-            graph_text = f'  {self.id} [style=filled, shape={shape}, fillcolor=lavenderblush3, label="{self.operation}"];\n'
+            operation = self.subscripts if isinstance(self, Einsum) else self.operation
+            graph_text = f'  {self.id} [style=filled, shape={shape}, fillcolor=lavenderblush3, label="{operation}", fontname=Courier];\n'
             graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
             graph_text += f"".join([c._graph for c in self.operands])
             return graph_text
         else:
             shape = ("circle" if len(self.name) <= 3 else "ellipse") if isinstance(self, Constant) else "doublecircle"
             fillcolor = "ivory3" if isinstance(self, Constant) else "lightsteelblue"
-            return f'  {self.id} [style=filled, shape={shape}, fillcolor={fillcolor}, label="{self.name}"];\n'
+            return f'  {self.id} [style=filled, shape={shape}, fillcolor={fillcolor}, label="{self.name}", fontname=Courier];\n'
 
     @property
     def graph(self) -> str:
