@@ -25,7 +25,7 @@ class TestVariable(unittest.TestCase):
     def test_nodes_and_constants_repr_str(self):
         x = Variable('x')
         f = x + 1
-        self.assertEqual(repr(f), "Node(name='x + 1', operation='+', operands=('x', 1))")
+        self.assertEqual(repr(f), "Node(name='x + 1', operation='add', operands=('x', 1))")
         self.assertEqual(str(f), 'x + 1')
 
         one = f.operands[1]

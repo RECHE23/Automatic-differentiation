@@ -14,47 +14,51 @@ global erf, neg, erfc, sinh, asin, log10, log, atan, sin, asinh, acos, cos, sqrt
 OPERATIONS = {
     # Unary mathematical operations:
     'unary': {
-        'neg': (np.negative, lambda item, bp: -np.ones_like(item.value_fn()) * bp),
-        'abs': (np.abs, lambda item, bp: np.sign(item.value_fn()) * bp),
-        'exp': (np.exp, lambda item, bp: np.exp(item.value_fn()) * bp),
-        'log': (np.log, lambda item, bp: 1.0 / item.value_fn() * bp),
-        'log10': (np.log10, lambda item, bp: 1.0 / (item.value_fn() * np.log(10.0)) * bp),
-        'sin': (np.sin, lambda item, bp: np.cos(item.value_fn()) * bp),
-        'asin': (np.arcsin, lambda item, bp: 1.0 / np.sqrt(1 - item.value_fn() ** 2) * bp),
-        'cos': (np.cos, lambda item, bp: -np.sin(item.value_fn()) * bp),
-        'acos': (np.arccos, lambda item, bp: -1.0 / np.sqrt(1.0 - item.value_fn() ** 2.0) * bp),
-        'tan': (np.tan, lambda item, bp: 1.0 / np.cos(item.value_fn()) ** 2.0 * bp),
-        'atan': (np.arctan, lambda item, bp: 1.0 / (1.0 + item.value_fn() ** 2.0) * bp),
-        'sinh': (np.sinh, lambda item, bp: np.cosh(item.value_fn()) * bp),
-        'asinh': (np.arcsinh, lambda item, bp: 1.0 / np.sqrt(1.0 + item.value_fn() ** 2.0) * bp),
-        'cosh': (np.cosh, lambda item, bp: np.sinh(item.value_fn()) * bp),
-        'acosh': (np.arccosh, lambda item, bp: 1.0 / np.sqrt(item.value_fn() ** 2.0 - 1.0) * bp),
-        'tanh': (np.tanh, lambda item, bp: 1.0 / np.cosh(item.value_fn()) ** 2.0 * bp),
-        'atanh': (np.arctanh, lambda item, bp: 1.0 / (1.0 - item.value_fn() ** 2.0) * bp),
-        'sqrt': (np.sqrt, lambda item, bp: 0.5 / np.sqrt(item.value_fn()) * bp),
-        'cbrt': (np.cbrt, lambda item, bp: 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0)) * bp),
-        'erf': (np.vectorize(math.erf), lambda item, bp: 2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * bp),
-        'erfc': (np.vectorize(math.erfc), lambda item, bp: -2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * bp),
-        'transpose': (np.transpose, lambda item, bp, axes=None: np.transpose(bp, axes=np.argsort(axes) if axes is not None else None))
+        'neg': (np.negative, lambda item, grad: -np.ones_like(item.value_fn()) * grad),
+        'abs': (np.abs, lambda item, grad: np.sign(item.value_fn()) * grad),
+        'exp': (np.exp, lambda item, grad: np.exp(item.value_fn()) * grad),
+        # TODO: Handle the case where item.value_fn() == 0:
+        'log': (np.log, lambda item, grad: 1.0 / item.value_fn() * grad),
+        # TODO: Handle the case where item.value_fn() == 0:
+        'log10': (np.log10, lambda item, grad: 1.0 / (item.value_fn() * np.log(10.0)) * grad),
+        'sin': (np.sin, lambda item, grad: np.cos(item.value_fn()) * grad),
+        'asin': (np.arcsin, lambda item, grad: 1.0 / np.sqrt(1 - item.value_fn() ** 2) * grad),
+        'cos': (np.cos, lambda item, grad: -np.sin(item.value_fn()) * grad),
+        'acos': (np.arccos, lambda item, grad: -1.0 / np.sqrt(1.0 - item.value_fn() ** 2.0) * grad),
+        'tan': (np.tan, lambda item, grad: 1.0 / np.cos(item.value_fn()) ** 2.0 * grad),
+        'atan': (np.arctan, lambda item, grad: 1.0 / (1.0 + item.value_fn() ** 2.0) * grad),
+        'sinh': (np.sinh, lambda item, grad: np.cosh(item.value_fn()) * grad),
+        'asinh': (np.arcsinh, lambda item, grad: 1.0 / np.sqrt(1.0 + item.value_fn() ** 2.0) * grad),
+        'cosh': (np.cosh, lambda item, grad: np.sinh(item.value_fn()) * grad),
+        'acosh': (np.arccosh, lambda item, grad: 1.0 / np.sqrt(item.value_fn() ** 2.0 - 1.0) * grad),
+        'tanh': (np.tanh, lambda item, grad: 1.0 / np.cosh(item.value_fn()) ** 2.0 * grad),
+        'atanh': (np.arctanh, lambda item, grad: 1.0 / (1.0 - item.value_fn() ** 2.0) * grad),
+        'sqrt': (np.sqrt, lambda item, grad: 0.5 / np.sqrt(item.value_fn()) * grad),
+        'cbrt': (np.cbrt, lambda item, grad: 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0)) * grad),
+        'erf': (np.vectorize(math.erf), lambda item, grad: 2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * grad),
+        'erfc': (np.vectorize(math.erfc), lambda item, grad: -2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * grad),
+        'transpose': (np.transpose, lambda item, grad, axes=None: np.transpose(grad, axes=np.argsort(axes) if axes is not None else None))
     },
     # Binary mathematical operations:
     'binary': {
-        '+': (np.add, lambda left, right, bp: (np.ones_like(left.value_fn()) * bp,
-                                               np.ones_like(right.value_fn()) * bp)),
-        '-': (np.subtract, lambda left, right, bp: (np.ones_like(left.value_fn()) * bp,
-                                                    -np.ones_like(right.value_fn()) * bp)),
-        '*': (np.multiply, lambda left, right, bp: (right.value_fn() * bp,
-                                                    left.value_fn() * bp)),
-        '/': (np.divide, lambda left, right, bp: (1 / right.value_fn() * bp,
-                                                  - left.value_fn() / right.value_fn() ** 2 * bp)),
-        '@': (np.matmul, lambda left, right, bp: (np.matmul(bp, np.swapaxes(right.value_fn().conj(), -1, -2)),
-                                                  np.matmul(np.swapaxes(left.value_fn().conj(), -1, -2), bp))),
-        '**': (np.power, lambda left, right, bp: (left.value_fn() ** (right.value_fn() - 1) * right.value_fn() * bp,
-                                                  left.value_fn() ** right.value_fn() * np.log(left.value_fn()) * bp)),
+        'add': (np.add, lambda left, right, grad: (np.ones_like(left.value_fn()) * grad,
+                                                   np.ones_like(right.value_fn()) * grad)),
+        'subtract': (np.subtract, lambda left, right, grad: (np.ones_like(left.value_fn()) * grad,
+                                                             -np.ones_like(right.value_fn()) * grad)),
+        'multiply': (np.multiply, lambda left, right, grad: (right.value_fn() * grad,
+                                                             left.value_fn() * grad)),
+        # TODO: Handle the case where right.value_fn() == 0:
+        'divide': (np.divide, lambda left, right, grad: (1 / right.value_fn() * grad,
+                                                         - left.value_fn() / right.value_fn() ** 2 * grad)),
+        'matmul': (np.matmul, lambda left, right, grad: (np.matmul(grad, np.swapaxes(right.value_fn().conj(), -1, -2)),
+                                                         np.matmul(np.swapaxes(left.value_fn().conj(), -1, -2), grad))),
+        # TODO: Handle the case where left.value_fn() <= 0:
+        'power': (np.power, lambda left, right, grad: (grad * (right.value_fn() * np.power(left.value_fn(), (right.value_fn() - 1))).conj(),
+                                                       grad * (np.power(left.value_fn(), right.value_fn()) * np.log(left.value_fn())).conj()))
     },
     # Priority of operations (0 being the highest priority):
     'priority': {
-        '**': 0,
+        'power': 0,
         'neg': 1,
         'abs': 1,
         'exp': 1,
@@ -78,11 +82,21 @@ OPERATIONS = {
         'erfc': 1,
         'einsum': 1,
         'transpose': 1,
-        '*': 2,
-        '/': 2,
-        '@': 2,
-        '+': 3,
-        '-': 3}
+        'multiply': 2,
+        'divide': 2,
+        'matmul': 2,
+        'add': 3,
+        'subtract': 3},
+    'repr': {
+        'power': lambda left, right: f"{left} ** {right}",
+        'neg': lambda item: f"-{item}",
+        'transpose': lambda item: f"{item}.T",
+        'multiply': lambda left, right: f"{left} * {right}",
+        'divide': lambda left, right: f"{left} / {right}",
+        'matmul': lambda left, right: f"{left} @ {right}",
+        'add': lambda left, right: f"{left} + {right}",
+        'subtract': lambda left, right: f"{left} - {right}"
+    }
 }
 
 
@@ -171,7 +185,7 @@ class Variable:
     @property
     def _graph(self) -> str:
         if isinstance(self, Node):
-            shape = "octagon" if isinstance(self, Einsum) else "square"
+            shape = "octagon" if isinstance(self, Einsum) else ("square" if len(self.name) <= 3 else "box")
             operation = self.subscripts if isinstance(self, Einsum) else self.operation
             graph_text = f'  {self.id} [style=filled, shape={shape}, fillcolor=lavenderblush3, label="{operation}", fontname=Courier];\n'
             graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
@@ -185,6 +199,7 @@ class Variable:
     @property
     def graph(self) -> str:
         return f"digraph {{\n" \
+               f"  ordering=out\n" \
                f"  fontsize=15\n" \
                f"  labelloc=\"t\"\n" \
                f"  label=\"Computational graph\"\n" \
@@ -224,45 +239,45 @@ class Variable:
 
     @property
     def grads(self) -> Dict[Variable, float]:
-        assert all(v.value is not None for v in self.variables),\
+        assert all(v.value is not None for v in self.variables), \
             "An evaluation of the formula must be done before trying to read the grads."
         return self.compute_gradients()
 
     def __add__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(self, other, "+")
+        return Node.binary_operation(self, other, 'add')
 
     def __radd__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(other, self, "+")
+        return Node.binary_operation(other, self, 'add')
 
     def __sub__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(self, other, "-")
+        return Node.binary_operation(self, other, 'subtract')
 
     def __rsub__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(other, self, "-")
+        return Node.binary_operation(other, self, 'subtract')
 
     def __mul__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(self, other, "*")
+        return Node.binary_operation(self, other, 'multiply')
 
     def __rmul__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(other, self, "*")
+        return Node.binary_operation(other, self, 'multiply')
 
     def __truediv__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(self, other, "/")
+        return Node.binary_operation(self, other, 'divide')
 
     def __rtruediv__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(other, self, "/")
+        return Node.binary_operation(other, self, 'divide')
 
     def __matmul__(self, other: Variable | np.ndarray) -> Node:
-        return Node.binary_operation(self, other, "@")
+        return Node.binary_operation(self, other, 'matmul')
 
     def __rmatmul__(self, other: Variable | np.ndarray) -> Node:
-        return Node.binary_operation(other, self, "@")
+        return Node.binary_operation(other, self, 'matmul')
 
     def __pow__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(self, other, "**")
+        return Node.binary_operation(self, other, 'power')
 
     def __rpow__(self, other: Variable | SupportsFloat) -> Node:
-        return Node.binary_operation(other, self, "**")
+        return Node.binary_operation(other, self, 'power')
 
     def __neg__(self) -> Node:
         return Node.unary_operation(self, "neg")
@@ -428,7 +443,7 @@ class Node(Variable):
         elif n == 2:
             left, right = self.operands
             if left.shape and right.shape:
-                if self.operation == '@':
+                if self.operation == 'matmul':
                     if left.shape[1] != right.shape[0]:
                         raise ValueError(
                             f"Matrix dimensions do not align for matrix multiplication: {left.shape} and {right.shape}.")
@@ -444,10 +459,10 @@ class Node(Variable):
     @staticmethod
     def _apply_parenthesis_if_needed(item: Variable, op: str, right: bool = False) -> str:
         if isinstance(item, Node):
-            if op == 'neg' and item.operation in ('+', '-'):
+            if op == 'neg' and item.operation in ('add', 'subtract'):
                 # This prevents the conversion of -(x + y) to become -x + y:
                 return f"({item.name})"
-            if right and op == '/' and item.operation in ('+', '-', '*', '/'):
+            if right and op == 'divide' and item.operation in ('add', 'subtract', 'multiply', 'divide'):
                 # This prevents the conversion of 1 / (x * y) to become 1 / x * y:
                 return f"({item.name})"
             if OPERATIONS['priority'][item.operation] > OPERATIONS['priority'][op]:
@@ -489,9 +504,9 @@ class Node(Variable):
 
         item = Variable._ensure_is_a_variable(item)
         operands = (item,)
-        if operation == 'neg':
+        if operation in OPERATIONS['repr']:
             item_name = Node._apply_parenthesis_if_needed(item, operation)
-            name = f"-{item_name}"
+            name = OPERATIONS['repr'][operation](item_name)
         else:
             name = f"{operation}({item.name})"
 
@@ -542,9 +557,12 @@ class Node(Variable):
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
         operands = (left, right)
-        left_name = Node._apply_parenthesis_if_needed(left, operation)
-        right_name = Node._apply_parenthesis_if_needed(right, operation, right=True)
-        name = f"{left_name} {operation} {right_name}"
+        if operation in OPERATIONS['repr']:
+            left_name = Node._apply_parenthesis_if_needed(left, operation)
+            right_name = Node._apply_parenthesis_if_needed(right, operation, right=True)
+            name = OPERATIONS['repr'][operation](left_name, right_name)
+        else:
+            name = f"{operation}({left.name}, {right.name})"
 
         def value_fn() -> float | np.ndarray:
             return OPERATIONS['binary'][operation][0](left.value_fn(), right.value_fn(), **params)
@@ -640,7 +658,7 @@ class Einsum(Node):
             raise ValueError("Number of operands doesn't match the einsum string!")
 
         for operand, operand_subscripts in zip(self.operands, self.subscripts_list[:-1]):
-            if all((len(operand.shape), len(operand.shape) != len(operand_subscripts),  "..." not in operand_subscripts, operand_subscripts)):
+            if all((len(operand.shape), len(operand.shape) != len(operand_subscripts), "..." not in operand_subscripts, operand_subscripts)):
                 raise ValueError(f"Dimension of operand {operand} doesn't match the string!"
                                  f" Shape: {operand.shape}, string: '{operand_subscripts}', subscripts: '{self.subscripts}'")
 
