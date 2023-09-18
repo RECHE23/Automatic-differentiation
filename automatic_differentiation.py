@@ -236,8 +236,32 @@ class Variable:
             "An evaluation of the formula must be done before trying to read the grads."
         return self.compute_gradients()
 
+    @property
+    def at(self) -> Dict[Variable, np.ndarray]:
+        return {var: var.value for var in self.variables}
+
+    @at.setter
+    def at(self, variable_assignments: Dict[Variable | str, float | np.ndarray]) -> None:
+        if variable_assignments is not None:
+            if all(isinstance(k, Variable) for k in variable_assignments.keys()):
+                # The dictionary is of type Dict[Variable, float | np.ndarray]:
+                assert all(v.name in variable_assignments for v in self.variables)
+            else:
+                # The dictionary is of type Dict[str, float | np.ndarray]:
+                assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
+                variable_assignments = {v: variable_assignments[v.name] for v in self.variables}
+
+            for k, v in variable_assignments.items():
+                k.value = v
+        if isinstance(self, Node):
+            self._validate_operands()
+
     def __array__(self):
         return np.array(self.value)
+
+    @property
+    def T(self) -> Node:
+        return Node.unary_operation(self, "transpose")
 
     def __add__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'add')
@@ -281,10 +305,6 @@ class Variable:
     def __abs__(self) -> Node:
         return Node.unary_operation(self, "abs")
 
-    @property
-    def T(self) -> Node:
-        return Node.unary_operation(self, "transpose")
-
     def evaluate_at(self, **variable_assignments: float | np.ndarray) -> np.ndarray:
         """
         Evaluate the value of the variable with specific variable assignments.
@@ -312,7 +332,7 @@ class Variable:
         >>> result = formula.evaluate_at(x=2, y=3, z=4)
         >>> print(result)
         """
-        self._apply_variable_assignments(variable_assignments)
+        self.at = variable_assignments
         self.value = self.value_fn()
         return self.value
 
@@ -343,7 +363,7 @@ class Variable:
         >>> gradients = formula.evaluate_gradients_at(x=2, y=3, z=4)
         >>> print(gradients[x])
         """
-        self._apply_variable_assignments(variable_assignments)
+        self.at = variable_assignments
         return self.compute_gradients()
 
     def compute_gradients(self, backpropagation: float | np.ndarray = None) -> Dict[Variable, np.ndarray]:
@@ -365,7 +385,6 @@ class Variable:
         This method computes gradients of the variable with respect to all other variables in the computation graph.
         It allows you to perform backpropagation to compute gradients in a reverse mode.
         """
-
         if backpropagation is None:
             backpropagation = np.ones_like(self.value_fn())
 
@@ -374,21 +393,6 @@ class Variable:
             [var.compute_gradients(backpropagation=val) for var, val in self.gradient_fn(backpropagation)],
             {self: backpropagation}
         )
-
-    def _apply_variable_assignments(self, variable_assignments: Dict[Variable | str, float | np.ndarray]) -> None:
-        if variable_assignments is not None:
-            if all(isinstance(k, Variable) for k in variable_assignments.keys()):
-                # The dictionary is of type Dict[Variable, float | np.ndarray]:
-                assert all(v.name in variable_assignments for v in self.variables)
-            else:
-                # The dictionary is of type Dict[str, float | np.ndarray]:
-                assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
-                variable_assignments = {v: variable_assignments[v.name] for v in self.variables}
-
-            for k, v in variable_assignments.items():
-                k.value = v
-        if isinstance(self, Node):
-            self._validate_operands()
 
     @staticmethod
     def _ensure_is_a_variable(other: Variable | np.ndarray | SupportsFloat):
