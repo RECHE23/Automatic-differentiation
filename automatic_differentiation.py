@@ -111,11 +111,11 @@ class Variable:
     ----------
     name : str
         The name of the variable.
-    value : float | np.ndarray, optional
+    value : np.ndarray, optional
         The initial value of the variable, by default None.
-    value_fn : Callable[[], float | np.ndarray], optional
+    value_fn : Callable[[], np.ndarray], optional
         A function that computes the value of the variable, by default None.
-    gradient_fn : Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]], optional
+    gradient_fn : Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]], optional
         A function that computes gradients, by default None.
 
     Attributes
@@ -158,23 +158,23 @@ class Variable:
     """
     variables: Set[Variable]
     name: str
-    value_fn: Callable[[], float | np.ndarray]
-    gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]]
+    value_fn: Callable[[], np.ndarray]
+    gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]]
     id: str
 
     def __init__(self, name: str, value: float | np.ndarray = None,
-                 value_fn: Callable[[], float | np.ndarray] = None,
-                 gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]] = None):
+                 value_fn: Callable[[], np.ndarray] = None,
+                 gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]] = None):
         self.variables = {self}
         self.name = name
-        self._value = value
+        self.value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn if gradient_fn is not None else lambda backpropagation: []
         self.id = f"var_{id(self):x}"
 
     def __repr__(self) -> str:
-        value_txt = f"ndarray{self.value.shape}" if isinstance(self.value, np.ndarray) else self.value
-        value_txt = f", value={value_txt}" if self.value is not None else ""
+        value_txt = f"ndarray{self.value.shape}" if self.value.shape != () else self.value
+        value_txt = "" if np.any(self.value) is None else f", value={value_txt}"
         name_value_text = f"{self.__class__.__name__}(name='{self.name}'{value_txt}"
         if isinstance(self, Node):
             operands = [f"{n.name}" if isinstance(n, Constant) else f"'{n.name}'" for n in self.operands] or ", "
@@ -210,76 +210,67 @@ class Variable:
 
     @property
     def shape(self) -> Tuple[int, ...]:
-        if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'shape'):
-            return self.value.shape
-        return self._shape if hasattr(self, '_shape') else ()
+        return self.value.shape
 
     @property
     def ndim(self) -> int:
-        if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'ndim'):
-            return self.value.ndim
-        return self._ndim if hasattr(self, '_ndim') else 1
+        return self.value.ndim
 
     @property
     def size(self) -> int:
-        if not isinstance(self, Node) and self.value is not None and hasattr(self.value, 'size'):
-            return self.value.size
-        return self._size if hasattr(self, '_size') else 1
+        return self.value.size
 
     @property
-    def value(self) -> Optional[float | np.ndarray]:
-        if self._value is None:
-            return None
-        if isinstance(self._value, np.ndarray):
-            return self._value
-        return float(self._value)
+    def value(self) -> Optional[np.ndarray]:
+        return self._value
 
     @value.setter
-    def value(self, value: float | np.ndarray) -> None:
-        self._value = value
-        if isinstance(value, np.ndarray):
-            self._shape = value.shape
+    def value(self, value: SupportsFloat | np.ndarray) -> None:
+        self._value = np.array(value)
 
     @property
-    def grads(self) -> Dict[Variable, float]:
+    def grads(self) -> Dict[Variable, np.ndarray]:
         assert all(v.value is not None for v in self.variables), \
             "An evaluation of the formula must be done before trying to read the grads."
         return self.compute_gradients()
 
-    def __add__(self, other: Variable | SupportsFloat) -> Node:
+    def __array__(self):
+        return np.array(self.value)
+
+    def __add__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'add')
 
-    def __radd__(self, other: Variable | SupportsFloat) -> Node:
+    def __radd__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, 'add')
 
-    def __sub__(self, other: Variable | SupportsFloat) -> Node:
+    def __sub__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'subtract')
 
-    def __rsub__(self, other: Variable | SupportsFloat) -> Node:
+    def __rsub__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, 'subtract')
 
-    def __mul__(self, other: Variable | SupportsFloat) -> Node:
+    def __mul__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'multiply')
 
-    def __rmul__(self, other: Variable | SupportsFloat) -> Node:
+    def __rmul__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, 'multiply')
 
-    def __truediv__(self, other: Variable | SupportsFloat) -> Node:
+    def __truediv__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'divide')
 
-    def __rtruediv__(self, other: Variable | SupportsFloat) -> Node:
+    def __rtruediv__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, 'divide')
 
     def __matmul__(self, other: Variable | np.ndarray) -> Node:
         return Node.binary_operation(self, other, 'matmul')
 
-    def __rmatmul__(self, other: Variable | np.ndarray) -> Node:
+    def __rmatmul__(self, other: Variable | np.ndarray | np.ndarray) -> Node:
         return Node.binary_operation(other, self, 'matmul')
 
-    def __pow__(self, other: Variable | SupportsFloat) -> Node:
+    def __pow__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'power')
 
-    def __rpow__(self, other: Variable | SupportsFloat) -> Node:
+    def __rpow__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(other, self, 'power')
 
     def __neg__(self) -> Node:
@@ -292,7 +283,7 @@ class Variable:
     def T(self) -> Node:
         return Node.unary_operation(self, "transpose")
 
-    def evaluate_at(self, **variable_assignments: float | np.ndarray) -> float | np.ndarray:
+    def evaluate_at(self, **variable_assignments: float | np.ndarray) -> np.ndarray:
         """
         Evaluate the value of the variable with specific variable assignments.
 
@@ -303,7 +294,7 @@ class Variable:
 
         Returns
         -------
-        float | np.ndarray
+        np.ndarray
             The evaluated value of the variable after applying the variable assignments.
 
         Notes
@@ -324,7 +315,7 @@ class Variable:
         return self.value
 
     def compute_gradients(self, variable_assignments: Dict[Variable, float | np.ndarray] = None,
-                          backpropagation: float | np.ndarray = None) -> Dict[Variable, float | np.ndarray]:
+                          backpropagation: float | np.ndarray = None) -> Dict[Variable, np.ndarray]:
         """
         Compute gradients for the variable.
 
@@ -421,9 +412,9 @@ class Node(Variable):
         The operation performed by the node.
     operands : Tuple[Variable, ...]
         The operands used in the operation.
-    value_fn : Callable[[], float | np.ndarray], optional
+    value_fn : Callable[[], np.ndarray], optional
         A function that computes the value of the node, by default None.
-    gradient_fn : Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]], optional
+    gradient_fn : Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]], optional
         A function that computes gradients, by default None.
     """
     operation: str
@@ -431,8 +422,8 @@ class Node(Variable):
 
     def __init__(
             self, name: str, operation: str, operands: Tuple[Variable, ...],
-            value_fn: Callable[[], float | np.ndarray] = None,
-            gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, float | np.ndarray], ...]] = lambda: []
+            value_fn: Callable[[], np.ndarray] = None,
+            gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]] = lambda: []
     ):
         super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.operation = operation
@@ -517,10 +508,10 @@ class Node(Variable):
         else:
             name = f"{operation}({item.name})"
 
-        def value_fn() -> float | np.ndarray:
+        def value_fn() -> np.ndarray:
             return OPERATIONS['unary'][operation][0](item.value_fn(), **params)
 
-        def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, float | np.ndarray], ...]:
+        def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, np.ndarray], ...]:
             grad = OPERATIONS['unary'][operation][1](item, backpropagation, **params)
             return (item, grad),
 
@@ -529,7 +520,7 @@ class Node(Variable):
     @staticmethod
     def binary_operation(
             left: Variable | np.ndarray | SupportsFloat,
-            right: Variable | SupportsFloat,
+            right: Variable | np.ndarray | SupportsFloat,
             operation: str,
             **params: Any
     ) -> Node:
@@ -540,7 +531,7 @@ class Node(Variable):
         ----------
         left : Variable | np.ndarray | SupportsFloat
             The left operand.
-        right : Variable | SupportsFloat
+        right : Variable | np.ndarray | SupportsFloat
             The right operand.
         operation : str
             The binary operation to perform.
@@ -571,10 +562,10 @@ class Node(Variable):
         else:
             name = f"{operation}({left.name}, {right.name})"
 
-        def value_fn() -> float | np.ndarray:
+        def value_fn() -> np.ndarray:
             return OPERATIONS['binary'][operation][0](left.value_fn(), right.value_fn(), **params)
 
-        def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, float | np.ndarray], ...]:
+        def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, np.ndarray], ...]:
             grad_left, grad_right = OPERATIONS['binary'][operation][1](left, right, backpropagation, **params)
             return (left, grad_left), (right, grad_right)
 

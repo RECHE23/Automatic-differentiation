@@ -29,7 +29,7 @@ class TestVariable(unittest.TestCase):
         self.assertEqual(str(f), 'x + 1')
 
         one = f.operands[1]
-        self.assertEqual(repr(one), "Constant(name='1', value=1.0)")
+        self.assertEqual(repr(one), "Constant(name='1', value=1)")
         self.assertEqual(str(one), '1')
 
     def test_variable_evaluate(self):
