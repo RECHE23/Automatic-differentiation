@@ -2,8 +2,7 @@ import unittest
 
 import numpy as np
 
-from automatic_differentiation import Variable, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, \
-    exp, log, log10, sqrt, cbrt, erf, erfc, einsum
+from automatic_differentiation import *
 
 
 class TestVariable(unittest.TestCase):
@@ -889,6 +888,42 @@ class TestNumpyArrayOperations(unittest.TestCase):
         grads = formula.grads
         expected_grad_x = np.array([[-3.0, -1.0, -1.0], [-3.0, -1.0, -1.0], [-3.0, -1.0, -1.0]])
         expected_grad_y = np.array([[13.0, 13.0, 13.0], [4.0, 4.0, 4.0], [12.0, 12.0, 12.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_matmul_operation5(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = x @ y
+
+        x_val = np.arange(3**3).reshape((3, 3, 3))
+        y_val = np.arange(3**3).reshape((3, 3, 3))
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[[ 15.0, 18.0, 21.0], [ 42.0, 54.0, 66.0], [ 69.0, 90.0, 111.0]], [[ 366.0, 396.0, 426.0], [ 474.0, 513.0, 552.0], [ 582.0, 630.0, 678.0]], [[1203.0, 1260.0, 1317.0], [1392.0, 1458.0, 1524.0], [1581.0, 1656.0, 1731.0]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[[ 3.0, 12.0, 21.0], [ 3.0, 12.0, 21.0], [ 3.0, 12.0, 21.0]], [[30.0, 39.0, 48.0], [30.0, 39.0, 48.0], [30.0, 39.0, 48.0]], [[57.0, 66.0, 75.0], [57.0, 66.0, 75.0], [57.0, 66.0, 75.0]]])
+        expected_grad_y = np.array([[[ 9.0, 9.0, 9.0], [12.0, 12.0, 12.0], [15.0, 15.0, 15.0]], [[36.0, 36.0, 36.0], [39.0, 39.0, 39.0], [42.0, 42.0, 42.0]], [[63.0, 63.0, 63.0], [66.0, 66.0, 66.0], [69.0, 69.0, 69.0]]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_transpose(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = transpose(x, axes=(1, 0, 2)) @ y
+
+        x_val = np.arange(3**3).reshape((3, 3, 3))
+        y_val = np.arange(3**3).reshape((3, 3, 3))
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[[ 15.0, 18.0, 21.0], [ 96.0, 126.0, 156.0], [ 177.0, 234.0, 291.0]], [[ 150.0, 162.0, 174.0], [ 474.0, 513.0, 552.0], [ 798.0, 864.0, 930.0]], [[ 447.0, 468.0, 489.0], [1014.0, 1062.0, 1110.0], [1581.0, 1656.0, 1731.0]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[[ 3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]], [[ 3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]], [[ 3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]]])
+        expected_grad_y = np.array([[[27.0, 27.0, 27.0], [30.0, 30.0, 30.0], [33.0, 33.0, 33.0]], [[36.0, 36.0, 36.0], [39.0, 39.0, 39.0], [42.0, 42.0, 42.0]], [[45.0, 45.0, 45.0], [48.0, 48.0, 48.0], [51.0, 51.0, 51.0]]])
         np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
         np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
 
