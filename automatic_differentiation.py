@@ -646,43 +646,39 @@ class Einsum(Node):
 
         def value_fn() -> np.ndarray:
             operands_list = [operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands]
+
+            self._validate_operands()
+            return contract(subscripts, *operands_list, optimize='optimal')
+
+        def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
+            operands_list = [operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands]
             self.subscripts = "->".join(parser.parse_einsum_input((subscripts, *operands_list))[:2])
             self.subscripts_list = re.split(r',|->', self.subscripts)
 
-            self._validate_operands()
-            return contract(self.subscripts, *operands_list, optimize='optimal')
-
-        def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
-
-            def partial_derivative(wrt: Variable, previous_grad: np.ndarray) -> np.ndarray:
-                """ Compute the partial derivative of the einsum operation with respect to a specific variable. """
-                if wrt not in self.operands:
-                    return np.zeros_like(wrt.value)
-
-                # Determine the location of the variable in the operands:
-                location = self.operands.index(wrt)
+            gradients = ()
+            for location, operand in enumerate(operands):
 
                 # Define the order of operands and subscripts to correctly perform the einsum:
                 order = list(range(len(self.subscripts_list)))
                 order[location], order[-1] = order[-1], order[location]
 
                 # Reorder the operands and subscripts according to the computed order:
-                operands_list = [operand.value for operand in self.operands] + [previous_grad]
+                operands_list = [operand.value for operand in self.operands] + [backpropagation]
                 operands_list = [operands_list[i] for i in order]
                 subscripts_list = [self.subscripts_list[i] for i in order]
 
-                # Handle ellipsis (multiple dimensions) in the einsum subscripts:
-                for i, letter in enumerate(re.findall(r'\.{3}|\S', self.subscripts_list[location])):
-                    if letter not in re.findall(r'\.{3}|\S', "".join(subscripts_list[:-1])):
+                # Handles the cases where there is a reduction:
+                for i, letter in enumerate(self.subscripts_list[location]):
+                    if letter not in "".join(subscripts_list[:-1]):
                         subscripts_list.insert(0, letter)
-                        dim = wrt.shape[i]
+                        dim = operand.shape[i]
                         operands_list.insert(0, np.ones(dim))
 
                 # Construct the subscripts string for the new einsum operation:
                 subscripts_ = ",".join(subscripts_list[:-1]) + "->" + subscripts_list[-1]
-                return contract(subscripts_, *operands_list[:-1], optimize='optimal')
+                gradients += ((operand, contract(subscripts_, *operands_list[:-1], optimize='optimal')), )
 
-            return tuple((operand, partial_derivative(operand, backpropagation)) for operand in self.operands)
+            return gradients
 
         operands_str = ", ".join(str(operand) for operand in self.operands)
         name = name if name is not None else f"einsum(subscripts='{self.subscripts}', {operands_str})"
