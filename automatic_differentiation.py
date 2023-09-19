@@ -160,9 +160,18 @@ class Variable:
     """
     variables: Set[Variable]
     name: str
+    value: np.ndarray
     value_fn: Callable[[], np.ndarray]
     gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]]
     id: str
+    graph: str
+    shape: Tuple[int, ...]
+    ndim: int
+    size: int
+    dtype: np.dtype
+    grads: Dict[Variable, np.ndarray]
+    at: Dict[Variable, np.ndarray]
+    T: Node
 
     def __init__(self, name: str, value: float | np.ndarray = None,
                  value_fn: Callable[[], np.ndarray] = None,
@@ -191,7 +200,7 @@ class Variable:
     def _graph(self) -> str:
         if isinstance(self, Node):
             shape = "octagon" if isinstance(self, Einsum) else ("square" if len(self.name) <= 3 else "box")
-            operation = self.subscripts if isinstance(self, Einsum) else self.operation
+            operation = self.subscripts.replace('->', ' → ') if isinstance(self, Einsum) else self.operation
             graph_text = f'  {self.id} [style=filled, shape={shape}, fillcolor=lavenderblush3, label="{operation}", fontname=Courier];\n'
             graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
             graph_text += f"".join([c._graph for c in self.operands])
@@ -221,6 +230,10 @@ class Variable:
     @property
     def size(self) -> int:
         return self.value.size
+
+    @property
+    def dtype(self) -> np.dtype:
+        return self.value.dtype
 
     @property
     def value(self) -> Optional[np.ndarray]:
@@ -257,11 +270,14 @@ class Variable:
             self._validate_operands()
 
     def __array__(self):
-        return np.array(self.value)
+        return self.value
 
     @property
     def T(self) -> Node:
         return Node.unary_operation(self, "transpose")
+
+    def __len__(self) -> int:
+        return len(self.value)
 
     def __add__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'add')
@@ -524,6 +540,7 @@ class Node(Variable):
 
         item = Variable._ensure_is_a_variable(item)
         operands = (item,)
+
         if operation in OPERATIONS['repr']:
             item_name = Node._apply_parenthesis_if_needed(item, operation)
             name = OPERATIONS['repr'][operation](item_name)
@@ -577,6 +594,7 @@ class Node(Variable):
         left = Variable._ensure_is_a_variable(left)
         right = Variable._ensure_is_a_variable(right)
         operands = (left, right)
+
         if operation in OPERATIONS['repr']:
             left_name = Node._apply_parenthesis_if_needed(left, operation)
             right_name = Node._apply_parenthesis_if_needed(right, operation, right=True)
