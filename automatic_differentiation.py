@@ -503,12 +503,13 @@ class Node(Variable):
                 if operand_subscripts[:3] == "...":
                     operand_subscripts, operand_shape = operand_subscripts[::-1], operand_shape[::-1]
 
-                for i, letter in enumerate(re.findall(r'\.{3}|\S', operand_subscripts)):
+                for i, symbol in enumerate(re.findall(r'\.{3}|\S', operand_subscripts)):
                     if i < len(operand_shape):
-                        dim = operand_shape[i] if len(letter) == 1 else operand_shape[i:]
-                        if subscript_to_dim.get(letter, dim) != dim:
-                            raise ValueError("Inconsistent dimension names!")
-                        subscript_to_dim[letter] = dim
+                        dim = operand_shape[i] if len(symbol) == 1 else operand_shape[i:]
+                        symbol_dim = subscript_to_dim.get(symbol, dim)
+                        if symbol != '...' and symbol_dim != dim:
+                            raise ValueError(f"Inconsistent dimension names! {symbol}->{symbol_dim}, expected {dim}.")
+                        subscript_to_dim[symbol] = dim
 
             self._shape = tuple(subscript_to_dim.get(letter, 0) for letter in in_subscripts)
         elif n == 1:

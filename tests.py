@@ -1045,7 +1045,101 @@ class TestNumpyArrayOperations(unittest.TestCase):
         np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
         np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
 
-    def test_complex_expression(self):
+    def test_einsum_operation6(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('i, i ->', x, y)
+
+        x_val = np.array([1.0, 2.0, 3.0])
+        y_val = np.array([4.0, 5.0, 6.0])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = 32.0
+        np.testing.assert_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([4.0, 5.0, 6.0])
+        expected_grad_y = np.array([1.0, 2.0, 3.0])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation7(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('i, i -> i', x, y)
+
+        x_val = np.array([1.0, 2.0, 3.0])
+        y_val = np.array([4.0, 5.0, 6.0])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([4.0, 10.0, 18.0])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([4.0, 5.0, 6.0])
+        expected_grad_y = np.array([1.0, 2.0, 3.0])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation8(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        formula = einsum('ij, jk, kl -> il', x, y, z)
+
+        x_val = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y_val = np.array([[2.0, 1.0], [0.0, 2.0]])
+        z_val = np.array([[1.0, 3.0], [2.0, 2.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
+        expected_result = np.array([[12.0, 16.0], [28.0, 40.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[12.0, 8.0], [12.0, 8.0]])
+        expected_grad_y = np.array([[16.0, 16.0], [24.0, 24.0]])
+        expected_grad_z = np.array([[8.0, 8.0], [16.0, 16.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+
+    def test_einsum_operation9(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('ij, jk -> ikj', x, y)
+
+        x_val = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y_val = np.array([[2.0, 1.0], [0.0, 2.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[[2.0, 0.0], [1.0, 4.0]], [[6.0, 0.0], [3.0, 8.0]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[3.0, 2.0], [3.0, 2.0]])
+        expected_grad_y = np.array([[4.0, 4.0], [6.0, 6.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation10(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('i, j -> ij', x, y)
+
+        x_val = np.array([1.0, 2.0])
+        y_val = np.array([3.0, 4.0])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[3.0, 4.0], [6.0, 8.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([7.0, 7.0])
+        expected_grad_y = np.array([3.0, 3.0])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation11(self):
         x = Variable('x')
         y = Variable('y')
         z = Variable('z')
@@ -1067,6 +1161,86 @@ class TestNumpyArrayOperations(unittest.TestCase):
         np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
         np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
 
+    def test_einsum_operation12(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('ij, i -> j', x, y)
+
+        x_val = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y_val = np.array([2.0, 3.0])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([11.0, 16.0])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[2.0, 2.0], [3.0, 3.0]])
+        expected_grad_y = np.array([3.0, 7.0])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation13(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        formula = einsum('i, ij, jk ->', x, y, z)
+
+        x_val = np.array([1.0, 2.0])
+        y_val = np.array([[2.0, 1.0], [0.0, 2.0]])
+        z_val = np.array([[1.0, 3.0], [2.0, 2.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
+        expected_result = 28.0
+        np.testing.assert_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([12.0, 8.0])
+        expected_grad_y = np.array([[4.0, 4.0], [8.0, 8.0]])
+        expected_grad_z = np.array([[2.0, 2.0], [5.0, 5.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+
+    def test_einsum_operation14(self):
+        x = Variable('x')
+        formula = einsum('ii ->', x)
+
+        x_val = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+        result = formula.evaluate_at(x=x_val)
+        expected_result = 5.0
+        np.testing.assert_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[1.0, 0.0], [0.0, 1.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+
+    def test_einsum_operation15(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        w = Variable('w')
+        formula = einsum('ij, jk, kl, lm -> im', x, y, z, w)
+
+        x_val = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y_val = np.array([[2.0, 1.0], [0.0, 2.0]])
+        z_val = np.array([[1.0, 3.0], [2.0, 2.0]])
+        w_val = np.array([[2.0, 1.0], [0.0, 2.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val, w=w_val)
+        expected_result = np.array([[24.0, 44.0], [56.0, 108.0]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[28.0, 20.0], [28.0, 20.0]])
+        expected_grad_y = np.array([[36.0, 40.0], [54.0, 60.0]])
+        expected_grad_z = np.array([[24.0, 16.0], [48.0, 32.0]])
+        expected_grad_w = np.array([[40.0, 40.0], [56.0, 56.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+        np.testing.assert_array_almost_equal(grads[w], expected_grad_w)
+
     def test_einsum_operation_with_ellipsis1(self):
         x = Variable('x')
         y = Variable('y')
@@ -1084,6 +1258,73 @@ class TestNumpyArrayOperations(unittest.TestCase):
         expected_grad_y = np.array([[20.0, 20.0, 20.0], [20.0, 20.0, 20.0]])
         np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
         np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation_with_ellipsis2(self):
+        x = Variable('x')
+        y = Variable('y')
+        formula = einsum('i, ...j -> ...ij', x, y)
+
+        x_val = np.array([1.0, 2.0])
+        y_val = np.array([[3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val)
+        expected_result = np.array([[[3.0, 4.0], [6.0, 8.0]], [[5.0, 6.0], [10.0, 12.0]], [[7.0, 8.0], [14.0, 16.0]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([33.0, 33.0])
+        expected_grad_y = np.array([[3.0, 3.0], [3.0, 3.0], [3.0, 3.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+
+    def test_einsum_operation_with_ellipsis3(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        formula = einsum('...i, ...j, ...k -> ...ijk', x, y, z)
+
+        x_val = np.array([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
+        y_val = np.array([[[2.0, 1.0], [0.0, 2.0]], [[1.0, 2.0], [2.0, 1.0]]])
+        z_val = np.array([[[1.0, 3.0], [2.0, 2.0]], [[0.0, 1.0], [1.0, 0.0]]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
+        expected_result = np.array([[[[[2.0, 6.0], [1.0, 3.0]], [[4.0, 12.0], [2.0, 6.0]]], [[[0.0, 0.0], [12.0, 12.0]], [[0.0, 0.0], [16.0, 16.0]]]], [[[[0.0, 5.0], [0.0, 10.0]], [[0.0, 6.0], [0.0, 12.0]]], [[[14.0, 0.0], [7.0, 0.0]], [[16.0, 0.0], [8.0, 0.0]]]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        grads = formula.grads
+        expected_grad_x = np.array([[[12.0, 12.0], [8.0, 8.0]], [[3.0, 3.0], [3.0, 3.0]]])
+        expected_grad_y = np.array([[[12.0, 12.0], [28.0, 28.0]], [[11.0, 11.0], [15.0, 15.0]]])
+        expected_grad_z = np.array([[[9.0, 9.0], [14.0, 14.0]], [[33.0, 33.0], [45.0, 45.0]]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+
+    def test_einsum_operation_with_ellipsis4(self):
+        x = Variable('x')
+        y = Variable('y')
+        z = Variable('z')
+        w = Variable('w')
+        formula = einsum('...i, ...j, ...k, l... -> ijkl', x, y, z, w)
+
+        x_val = np.array([[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]])
+        y_val = np.array([[2.0, 1.0], [0.0, 2.0]])
+        z_val = np.array([[[1.0, 3.0], [2.0, 2.0]]])
+        w_val = np.array([[2.0]])
+
+        result = formula.evaluate_at(x=x_val, y=y_val, z=z_val, w=w_val)
+        expected_result = np.array([[[[24.0], [72.0]], [[92.0], [116.0]]], [[[32.0], [96.0]], [[112.0], [144.0]]]])
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+        # TODO: Solve this problem... (Tensorflow can't even process this! Is PyTorch's result wrong?)
+        # grads = formula.grads
+        # expected_grad_x = np.array([[[[24.0, 24.0], [16.0, 16.0]], [[24.0, 24.0], [16.0, 16.0]]]])
+        # expected_grad_y = np.array([[112.0, 112.0], [176.0, 176.0]])
+        # expected_grad_z = np.array([[[84.0, 84.0], [88.0, 88.0]]])
+        # expected_grad_w = np.array([[344.0]])
+        # np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        # np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        # np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+        # np.testing.assert_array_almost_equal(grads[w], expected_grad_w)
 
 
 if __name__ == '__main__':
