@@ -1037,14 +1037,13 @@ class TestNumpyArrayOperations(unittest.TestCase):
         expected_result = np.array([6.0, 6.0, 6.0, 6.0])
         np.testing.assert_array_almost_equal(result, expected_result)
 
-        # TODO: Solve this problem:
-        # grads = formula.grads
-        # expected_grad_x = np.array([[[2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0]], [[0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0]], [[0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0]]])
-        # expected_grad_y = np.array([[4.0, 4.0, 4.0], [4.0, 4.0, 4.0]])
-        # expected_grad_z = np.array([[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]])
-        # np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
-        # np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
-        # np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+        grads = formula.grads
+        expected_grad_x = np.array([[[2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0]], [[0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0]], [[0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0]]])
+        expected_grad_y = np.array([[4.0, 4.0, 4.0], [4.0, 4.0, 4.0]])
+        expected_grad_z = np.array([[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
 
     def test_complex_expression(self):
         x = Variable('x')

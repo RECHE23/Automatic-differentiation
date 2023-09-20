@@ -156,7 +156,6 @@ class Variable:
     --------
     Constant : Represents a constant variable.
     Node : Represents a node in the computation graph.
-    Einsum : Represents an einsum operation.
     """
     variables: Set[Variable]
     name: str
@@ -199,8 +198,8 @@ class Variable:
     @property
     def _graph(self) -> str:
         if isinstance(self, Node):
-            shape = "octagon" if isinstance(self, Einsum) else ("square" if len(self.name) <= 3 else "box")
-            operation = self.subscripts.replace('->', ' → ') if isinstance(self, Einsum) else self.operation
+            shape = "octagon" if self.operation == "einsum" else ("square" if len(self.name) <= 3 else "box")
+            operation = self.params['subscripts'].replace('->', ' → ') if self.operation == "einsum" else self.operation
             graph_text = f'  {self.id} [style=filled, shape={shape}, fillcolor=lavenderblush3, label="{operation}", fontname=Courier];\n'
             graph_text += f"".join([f'  {self.id} -> {c.id};\n' for c in self.operands])
             graph_text += f"".join([c._graph for c in self.operands])
@@ -493,20 +492,7 @@ class Node(Variable):
     def _update_shape(self) -> None:
         n = len(self.operands)
 
-        if n == 1:
-            if self.operands[0].shape:
-                self._shape = self.operands[0].shape
-        elif n == 2:
-            left, right = self.operands
-            if left.shape and right.shape:
-                if self.operation == 'matmul':
-                    if left.shape[1] != right.shape[0]:
-                        raise ValueError(
-                            f"Matrix dimensions do not align for matrix multiplication: {left.shape} and {right.shape}.")
-                    self._shape = left.shape[1], right.shape[0]
-                else:
-                    self._shape = np.broadcast_shapes(left.shape, right.shape)
-        elif self.operation == "einsum":
+        if self.operation == "einsum":
             assert 'subscripts' in self.params
             in_subscripts = self.params['subscripts'].split('->')[0].split(',')
 
@@ -525,6 +511,19 @@ class Node(Variable):
                         subscript_to_dim[letter] = dim
 
             self._shape = tuple(subscript_to_dim.get(letter, 0) for letter in in_subscripts)
+        elif n == 1:
+            if self.operands[0].shape:
+                self._shape = self.operands[0].shape
+        elif n == 2:
+            left, right = self.operands
+            if left.shape and right.shape:
+                if self.operation == 'matmul':
+                    if left.shape[1] != right.shape[0]:
+                        raise ValueError(
+                            f"Matrix dimensions do not align for matrix multiplication: {left.shape} and {right.shape}.")
+                    self._shape = left.shape[1], right.shape[0]
+                else:
+                    self._shape = np.broadcast_shapes(left.shape, right.shape)
         else:
             raise NotImplementedError
 
@@ -651,6 +650,7 @@ class Node(Variable):
     def einsum(
             subscripts: str,
             *operands: Variable,
+            optimize='optimal',
             **params: Any
     ) -> Node:
         operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
@@ -667,27 +667,37 @@ class Node(Variable):
         params['subscripts'] = subscripts
 
         def value_fn() -> np.ndarray:
-            return contract(subscripts, *(operand.value_fn() for operand in operands), optimize='optimal')
+            return contract(subscripts, *(operand.value_fn() for operand in operands), optimize=optimize)
 
         def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
             operands_list = [operand.value_fn() for operand in operands]
-            in_out_subscripts_list = re.split(r',|->', "->".join(parser.parse_einsum_input((subscripts, *operands_list))[:2]))
+            parsed_einsum_input = parser.parse_einsum_input((subscripts, *operands_list))
+            in_out_subscripts_list = re.split(r',|->', "->".join(parsed_einsum_input[:2]))
 
+            # Get the dimension associated with a symbol:
+            parsed_input = parsed_einsum_input[0].split(',')
+            shapes = [op.shape for op in parsed_einsum_input[2]]
+            symbol_to_dim = {symbol: dim for symbols, dims in zip(parsed_input, shapes) for symbol, dim in zip(symbols, dims)}
 
             gradients = ()
             for operand_index, operand in enumerate(operands):
 
+                in_out_subscripts_list_ = in_out_subscripts_list[:]
+                original_var_label = in_out_subscripts_list_[operand_index]
+                var_label = reduce(lambda acc, x: acc + x if x not in acc else acc, original_var_label[::-1], "")[::-1]
+                in_out_subscripts_list_[operand_index] = var_label
+
                 # Define the order of operands and subscripts to correctly perform the einsum:
-                order = list(range(len(in_out_subscripts_list)))
+                order = list(range(len(in_out_subscripts_list_)))
                 order[operand_index], order[-1] = order[-1], order[operand_index]
 
                 # Reorder the operands and subscripts according to the computed order:
                 operands_list = [operand.value for operand in operands] + [backpropagation]
                 operands_list = [operands_list[i] for i in order]
-                subscripts_list = [in_out_subscripts_list[i] for i in order]
+                subscripts_list = [in_out_subscripts_list_[i] for i in order]
 
                 # Handles the cases where there is a reduction:
-                for i, letter in enumerate(in_out_subscripts_list[operand_index]):
+                for i, letter in enumerate(in_out_subscripts_list_[operand_index]):
                     if letter not in "".join(subscripts_list[:-1]):
                         subscripts_list.insert(0, letter)
                         dim = operand.shape[i]
@@ -695,14 +705,26 @@ class Node(Variable):
 
                 # Construct the subscripts string for the new einsum operation:
                 grad_subscripts = ",".join(subscripts_list[:-1]) + "->" + subscripts_list[-1]
-                gradients += ((operand, contract(grad_subscripts, *operands_list[:-1], optimize='optimal')), )
+
+                if len(original_var_label) != len(var_label):
+                    gradient = np.zeros(tuple(symbol_to_dim[i] for i in original_var_label))
+                    out_view_shape = tuple(symbol_to_dim[i] for i in var_label)
+                    strides = tuple(
+                        sum(gradient.strides[ind] for ind in (n for n, x in enumerate(original_var_label) if x == label)) for label in var_label
+                    )
+                    out_view = np.lib.stride_tricks.as_strided(gradient, shape=out_view_shape, strides=strides)
+                    contract(grad_subscripts, *operands_list[:-1], out=out_view, optimize=optimize)
+                else:
+                    gradient = contract(grad_subscripts, *operands_list[:-1], optimize=optimize)
+
+                gradients += ((operand, gradient), )
 
             return gradients
 
         return Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
 
 
-def einsum(subscripts: str, *operands: Variable) -> Node:
+def einsum(subscripts: str, *operands: Variable, optimize='optimal', **params) -> Node:
     """
     Create an einsum operation.
 
@@ -735,7 +757,7 @@ def einsum(subscripts: str, *operands: Variable) -> Node:
     --------
     Einsum : Represents an einsum operation in a computational graph.
     """
-    return Node.einsum(subscripts, *operands)
+    return Node.einsum(subscripts, *operands, optimize=optimize, **params)
 
 
 def set_variables(*names: str) -> Tuple[Variable, ...]:
