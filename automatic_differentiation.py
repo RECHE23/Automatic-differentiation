@@ -267,7 +267,7 @@ class Variable:
             for k, v in variable_assignments.items():
                 k.value = v
         if isinstance(self, Node):
-            self._validate_operands()
+            self._update_shape()
 
     def __array__(self):
         return self.value
@@ -467,10 +467,28 @@ class Node(Variable):
         self.operation = operation
         self.operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
         self.variables = set.union(*[operand.variables for operand in self.operands])
+        self._shape = None
+        self._size = None
 
-        self._validate_operands()
+        self._update_shape()
 
-    def _validate_operands(self) -> None:
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        return self._shape
+
+    @property
+    def ndim(self) -> int:
+        return len(self.shape)
+
+    @property
+    def size(self) -> int:
+        return np.prod(self.shape)
+
+    @property
+    def dtype(self) -> np.dtype:
+        return np.result_type(*self.operands)
+
+    def _update_shape(self) -> None:
         n = len(self.operands)
 
         if n == 1:
@@ -485,10 +503,9 @@ class Node(Variable):
                             f"Matrix dimensions do not align for matrix multiplication: {left.shape} and {right.shape}.")
                     self._shape = left.shape[1], right.shape[0]
                 else:
-                    if left.shape != right.shape:
-                        raise ValueError(
-                            f"Matrix dimensions do not align for itemwise operation: {left.shape} and {right.shape}.")
-                    self._shape = right.shape
+                    self._shape = np.broadcast_shapes(left.shape, right.shape)
+        elif self.operation == "einsum":
+            pass  # TODO!
         else:
             raise NotImplementedError
 
@@ -635,40 +652,39 @@ class Einsum(Node):
     Node : Represents a node in the computation graph.
     """
     subscripts: str
-    subscripts_list: List[str]
-    subscript_to_dim: Dict[str, int]
+    in_subscripts: List[str]
 
     def __init__(self, subscripts: str, *operands: Variable, name: str = None):
-        self.operands = tuple(operands)
+        self.operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
         self.subscripts = re.sub(r'\s+', '', subscripts)
-        self.subscripts_list = re.split(r',|->', self.subscripts)
-        self.subscript_to_dim = {}
+        in_ou_subscripts = self.subscripts.split('->')
+        self.in_subscripts = in_ou_subscripts[0].split(',')
+        assert 1 <= len(in_ou_subscripts) <= 2, f"Invalid einsum subscripts: {subscripts}"
+        assert len(self.in_subscripts) == len(self.operands), \
+            f"Number of input operands doesn't match input subscripts {self.in_subscripts} with {len(self.operands)} operands provided: {subscripts}."
 
         def value_fn() -> np.ndarray:
-            operands_list = [operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands]
-
-            self._validate_operands()
-            return contract(subscripts, *operands_list, optimize='optimal')
+            return contract(subscripts, *(operand.value_fn() for operand in self.operands), optimize='optimal')
 
         def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
-            operands_list = [operand.value_fn() if isinstance(operand, Variable) else operand for operand in self.operands]
+            operands_list = [operand.value_fn() for operand in self.operands]
             self.subscripts = "->".join(parser.parse_einsum_input((subscripts, *operands_list))[:2])
-            self.subscripts_list = re.split(r',|->', self.subscripts)
+            in_ou_subscripts_list = re.split(r',|->', self.subscripts)
 
             gradients = ()
-            for location, operand in enumerate(operands):
+            for operand_index, operand in enumerate(operands):
 
                 # Define the order of operands and subscripts to correctly perform the einsum:
-                order = list(range(len(self.subscripts_list)))
-                order[location], order[-1] = order[-1], order[location]
+                order = list(range(len(in_ou_subscripts_list)))
+                order[operand_index], order[-1] = order[-1], order[operand_index]
 
                 # Reorder the operands and subscripts according to the computed order:
                 operands_list = [operand.value for operand in self.operands] + [backpropagation]
                 operands_list = [operands_list[i] for i in order]
-                subscripts_list = [self.subscripts_list[i] for i in order]
+                subscripts_list = [in_ou_subscripts_list[i] for i in order]
 
                 # Handles the cases where there is a reduction:
-                for i, letter in enumerate(self.subscripts_list[location]):
+                for i, letter in enumerate(in_ou_subscripts_list[operand_index]):
                     if letter not in "".join(subscripts_list[:-1]):
                         subscripts_list.insert(0, letter)
                         dim = operand.shape[i]
@@ -687,14 +703,10 @@ class Einsum(Node):
     def __repr__(self) -> str:
         return self.name
 
-    def _validate_operands(self) -> None:
-        if len(self.operands) + 1 != len(self.subscripts_list):
-            raise ValueError("Number of operands doesn't match the einsum string!")
+    def _update_shape(self) -> None:
+        subscript_to_dim = {}
 
-        for operand, operand_subscripts in zip(self.operands, self.subscripts_list[:-1]):
-            if all((len(operand.shape), len(operand.shape) != len(operand_subscripts), "..." not in operand_subscripts, operand_subscripts)):
-                raise ValueError(f"Dimension of operand {operand} doesn't match the string!"
-                                 f" Shape: {operand.shape}, string: '{operand_subscripts}', subscripts: '{self.subscripts}'")
+        for operand, operand_subscripts in zip(self.operands, self.in_subscripts):
 
             operand_shape = operand.shape
             if operand_subscripts[:3] == "...":
@@ -703,11 +715,11 @@ class Einsum(Node):
             for i, letter in enumerate(re.findall(r'\.{3}|\S', operand_subscripts)):
                 if i < len(operand_shape):
                     dim = operand_shape[i] if len(letter) == 1 else operand_shape[i:]
-                    if self.subscript_to_dim.get(letter, dim) != dim:
+                    if subscript_to_dim.get(letter, dim) != dim:
                         raise ValueError("Inconsistent dimension names!")
-                    self.subscript_to_dim[letter] = dim
+                    subscript_to_dim[letter] = dim
 
-        self._shape = tuple(self.subscript_to_dim.get(letter, 0) for letter in self.subscripts_list[-1])
+        self._shape = tuple(subscript_to_dim.get(letter, 0) for letter in self.in_subscripts)
 
 
 def einsum(subscripts: str, *operands: Variable) -> Einsum:
