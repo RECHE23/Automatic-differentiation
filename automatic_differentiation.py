@@ -15,49 +15,49 @@ global erf, neg, erfc, sinh, asin, log10, log, atan, sin, asinh, acos, cos, sqrt
 OPERATIONS = {
     # Unary mathematical operations:
     'unary': {
-        'neg': (np.negative, lambda item, grad: -np.ones_like(item.value_fn()) * grad),
-        'abs': (np.abs, lambda item, grad: np.sign(item.value_fn()) * grad),
-        'exp': (np.exp, lambda item, grad: np.exp(item.value_fn()) * grad),
-        # TODO: Handle the case where item.value_fn() == 0:
-        'log': (np.log, lambda item, grad: 1.0 / item.value_fn() * grad),
-        # TODO: Handle the case where item.value_fn() == 0:
-        'log10': (np.log10, lambda item, grad: 1.0 / (item.value_fn() * np.log(10.0)) * grad),
-        'sin': (np.sin, lambda item, grad: np.cos(item.value_fn()) * grad),
-        'asin': (np.arcsin, lambda item, grad: 1.0 / np.sqrt(1 - item.value_fn() ** 2) * grad),
-        'cos': (np.cos, lambda item, grad: -np.sin(item.value_fn()) * grad),
-        'acos': (np.arccos, lambda item, grad: -1.0 / np.sqrt(1.0 - item.value_fn() ** 2.0) * grad),
-        'tan': (np.tan, lambda item, grad: 1.0 / np.cos(item.value_fn()) ** 2.0 * grad),
-        'atan': (np.arctan, lambda item, grad: 1.0 / (1.0 + item.value_fn() ** 2.0) * grad),
-        'sinh': (np.sinh, lambda item, grad: np.cosh(item.value_fn()) * grad),
-        'asinh': (np.arcsinh, lambda item, grad: 1.0 / np.sqrt(1.0 + item.value_fn() ** 2.0) * grad),
-        'cosh': (np.cosh, lambda item, grad: np.sinh(item.value_fn()) * grad),
-        'acosh': (np.arccosh, lambda item, grad: 1.0 / np.sqrt(item.value_fn() ** 2.0 - 1.0) * grad),
-        'tanh': (np.tanh, lambda item, grad: 1.0 / np.cosh(item.value_fn()) ** 2.0 * grad),
-        'atanh': (np.arctanh, lambda item, grad: 1.0 / (1.0 - item.value_fn() ** 2.0) * grad),
-        # TODO: Handle the case where item.value_fn() <= 0:
-        'sqrt': (np.sqrt, lambda item, grad: 0.5 / np.sqrt(item.value_fn()) * grad),
-        # TODO: Handle the case where item.value_fn() <= 0:
-        'cbrt': (np.cbrt, lambda item, grad: 1.0 / (3.0 * item.value_fn() ** (2.0 / 3.0)) * grad),
-        'erf': (np.vectorize(math.erf), lambda item, grad: 2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * grad),
-        'erfc': (np.vectorize(math.erfc), lambda item, grad: -2.0 * np.exp(-item.value_fn() ** 2.0) / np.sqrt(np.pi) * grad),
+        'neg': (np.negative, lambda item, grad: -np.ones_like(item.value) * grad),
+        'abs': (np.abs, lambda item, grad: np.sign(item.value) * grad),
+        'exp': (np.exp, lambda item, grad: np.exp(item.value) * grad),
+        # TODO: Handle the case where item.value == 0:
+        'log': (np.log, lambda item, grad: 1.0 / item.value * grad),
+        # TODO: Handle the case where item.value == 0:
+        'log10': (np.log10, lambda item, grad: 1.0 / (item.value * np.log(10.0)) * grad),
+        'sin': (np.sin, lambda item, grad: np.cos(item.value) * grad),
+        'asin': (np.arcsin, lambda item, grad: 1.0 / np.sqrt(1 - item.value ** 2) * grad),
+        'cos': (np.cos, lambda item, grad: -np.sin(item.value) * grad),
+        'acos': (np.arccos, lambda item, grad: -1.0 / np.sqrt(1.0 - item.value ** 2.0) * grad),
+        'tan': (np.tan, lambda item, grad: 1.0 / np.cos(item.value) ** 2.0 * grad),
+        'atan': (np.arctan, lambda item, grad: 1.0 / (1.0 + item.value ** 2.0) * grad),
+        'sinh': (np.sinh, lambda item, grad: np.cosh(item.value) * grad),
+        'asinh': (np.arcsinh, lambda item, grad: 1.0 / np.sqrt(1.0 + item.value ** 2.0) * grad),
+        'cosh': (np.cosh, lambda item, grad: np.sinh(item.value) * grad),
+        'acosh': (np.arccosh, lambda item, grad: 1.0 / np.sqrt(item.value ** 2.0 - 1.0) * grad),
+        'tanh': (np.tanh, lambda item, grad: 1.0 / np.cosh(item.value) ** 2.0 * grad),
+        'atanh': (np.arctanh, lambda item, grad: 1.0 / (1.0 - item.value ** 2.0) * grad),
+        # TODO: Handle the case where item.value <= 0:
+        'sqrt': (np.sqrt, lambda item, grad: 0.5 / np.sqrt(item.value) * grad),
+        # TODO: Handle the case where item.value <= 0:
+        'cbrt': (np.cbrt, lambda item, grad: 1.0 / (3.0 * item.value ** (2.0 / 3.0)) * grad),
+        'erf': (np.vectorize(math.erf), lambda item, grad: 2.0 * np.exp(-item.value ** 2.0) / np.sqrt(np.pi) * grad),
+        'erfc': (np.vectorize(math.erfc), lambda item, grad: -2.0 * np.exp(-item.value ** 2.0) / np.sqrt(np.pi) * grad),
         'transpose': (np.transpose, lambda item, grad, axes=None: np.transpose(grad, axes=np.argsort(axes) if axes is not None else None))
     },
     # Binary mathematical operations:
     'binary': {
-        'add': (np.add, lambda left, right, grad: (np.ones_like(left.value_fn()) * grad,
-                                                   np.ones_like(right.value_fn()) * grad)),
-        'subtract': (np.subtract, lambda left, right, grad: (np.ones_like(left.value_fn()) * grad,
-                                                             -np.ones_like(right.value_fn()) * grad)),
-        'multiply': (np.multiply, lambda left, right, grad: (right.value_fn() * grad,
-                                                             left.value_fn() * grad)),
-        # TODO: Handle the case where right.value_fn() == 0:
-        'divide': (np.divide, lambda left, right, grad: (1 / right.value_fn() * grad,
-                                                         - left.value_fn() / right.value_fn() ** 2 * grad)),
-        'matmul': (np.matmul, lambda left, right, grad: (np.matmul(grad, np.swapaxes(right.value_fn().conj(), -1, -2)),
-                                                         np.matmul(np.swapaxes(left.value_fn().conj(), -1, -2), grad))),
-        # TODO: Handle the case where left.value_fn() <= 0:
-        'power': (np.power, lambda left, right, grad: (grad * (right.value_fn() * np.power(left.value_fn(), (right.value_fn() - 1))).conj(),
-                                                       grad * (np.power(left.value_fn(), right.value_fn()) * np.log(left.value_fn())).conj()))
+        'add': (np.add, lambda left, right, grad: (np.ones_like(left.value) * grad,
+                                                   np.ones_like(right.value) * grad)),
+        'subtract': (np.subtract, lambda left, right, grad: (np.ones_like(left.value) * grad,
+                                                             -np.ones_like(right.value) * grad)),
+        'multiply': (np.multiply, lambda left, right, grad: (right.value * grad,
+                                                             left.value * grad)),
+        # TODO: Handle the case where right.value == 0:
+        'divide': (np.divide, lambda left, right, grad: (1 / right.value * grad,
+                                                         - left.value / right.value ** 2 * grad)),
+        'matmul': (np.matmul, lambda left, right, grad: (np.matmul(grad, np.swapaxes(right.value.conj(), -1, -2)),
+                                                         np.matmul(np.swapaxes(left.value.conj(), -1, -2), grad))),
+        # TODO: Handle the case where left.value <= 0:
+        'power': (np.power, lambda left, right, grad: (grad * (right.value * np.power(left.value, (right.value - 1))).conj(),
+                                                       grad * (np.power(left.value, right.value) * np.log(left.value)).conj()))
     },
     # Priority of operations (0 being the highest priority):
     'priority': {
@@ -182,10 +182,15 @@ class Variable:
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn if gradient_fn is not None else lambda backpropagation: []
         self.id = f"var_{id(self):x}"
+        self._modified = False
 
     def __repr__(self) -> str:
-        value_txt = f"ndarray{self.value.shape}" if self.value.shape != () else self.value
-        value_txt = "" if np.any(self.value) is None else f", value={value_txt}"
+        if not isinstance(self, Node):
+            value_txt = f"ndarray{self.value.shape}" if self.value.shape != () else self.value
+            value_txt = "" if np.any(self.value) is None else f", value={value_txt}"
+        else:
+            # TODO: Display the value of a node?
+            value_txt = ""
         name_value_text = f"{self.__class__.__name__}(name='{self.name}'{value_txt}"
         if isinstance(self, Node):
             operands = [f"{n.name}" if isinstance(n, Constant) else f"'{n.name}'" for n in self.operands] or ", "
@@ -237,6 +242,8 @@ class Variable:
 
     @property
     def value(self) -> Optional[np.ndarray]:
+        if isinstance(self, Node) and (np.any(self._value) is None or any(v._modified for v in self.variables)):
+            self._value = self.value_fn()
         return self._value
 
     @value.setter
@@ -265,9 +272,13 @@ class Variable:
                 variable_assignments = {v: variable_assignments[v.name] for v in self.variables}
 
             for k, v in variable_assignments.items():
-                k.value = v
+                if (k.value != v).any():
+                    if np.any(k.value) is not None:
+                        k._modified = True
+                    k.value = v
         if isinstance(self, Node):
             self._update_shape()
+            self._value = None
 
     def __array__(self):
         return self.value
@@ -349,7 +360,6 @@ class Variable:
         >>> print(result)
         """
         self.at = variable_assignments
-        self.value = self.value_fn()
         return self.value
 
     def evaluate_gradients_at(self, **variable_assignments: float | np.ndarray) -> Dict[Variable, np.ndarray]:
@@ -402,7 +412,7 @@ class Variable:
         It allows you to perform backpropagation to compute gradients in a reverse mode.
         """
         if backpropagation is None:
-            backpropagation = np.ones_like(self.value_fn())
+            backpropagation = np.ones_like(self.value)
 
         return reduce(
             lambda a, b: {k: a.get(k, 0) + b.get(k, 0) for k in set(a) | set(b)},
@@ -585,7 +595,7 @@ class Node(Variable):
             name = f"{operation}({item.name})"
 
         def value_fn() -> np.ndarray:
-            return OPERATIONS['unary'][operation][0](item.value_fn(), **params)
+            return OPERATIONS['unary'][operation][0](item.value, **params)
 
         def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, np.ndarray], ...]:
             grad = OPERATIONS['unary'][operation][1](item, backpropagation, **params)
@@ -640,7 +650,7 @@ class Node(Variable):
             name = f"{operation}({left.name}, {right.name})"
 
         def value_fn() -> np.ndarray:
-            return OPERATIONS['binary'][operation][0](left.value_fn(), right.value_fn(), **params)
+            return OPERATIONS['binary'][operation][0](left.value, right.value, **params)
 
         def gradient_fn(backpropagation: float | np.ndarray) -> Tuple[Tuple[Variable, np.ndarray], ...]:
             grad_left, grad_right = OPERATIONS['binary'][operation][1](left, right, backpropagation, **params)
@@ -679,7 +689,7 @@ class Node(Variable):
         params['subscripts'] = subscripts
 
         def value_fn() -> np.ndarray:
-            return contract(subscripts, *(operand.value_fn() for operand in operands), optimize=optimize)
+            return contract(subscripts, *(operand.value for operand in operands), optimize=optimize)
 
         def gradient_fn(backpropagation):
             # This solution is based on the code from MyGrad:
@@ -687,7 +697,7 @@ class Node(Variable):
 
             # Parse and uniformize the subscripts and their corresponding operands before evaluating the gradients:
             # (This is done using opt_einsum parser. This remove the need to deal with ellipsis (...) and exceptions.)
-            operands_list = [operand.value_fn() for operand in operands]
+            operands_list = [operand.value for operand in operands]
             in_subscripts, out_subscripts, raw_operands = parser.parse_einsum_input((subscripts, *operands_list))
             raw_operands = tuple(raw_operands)
             in_subscripts = in_subscripts.split(',')
@@ -723,7 +733,7 @@ class Node(Variable):
                 # If the right side of the subscripts contains a symbol that isn't on the left side,
                 # expand the backpropagation and add the symbol to the left side at the proper position:
                 if len(set(gradient_subscripts) - unique_in_symbols) > 0:
-                    expanded_dims = [slice(None) for i in range(backpropagation_copy.ndim)]
+                    expanded_dims = [slice(None) for _ in range(backpropagation_copy.ndim)]
                     backpropagation_shape = list(backpropagation_copy.shape)
                     for n, symbol in enumerate(gradient_subscripts):
                         if symbol not in unique_in_symbols:
@@ -746,7 +756,7 @@ class Node(Variable):
 
                     # Calculate the strides to map the data correctly in the view:
                     strides = tuple(
-                        sum(gradient.strides[ind] for ind in (n for n, x in enumerate(operand_original_subscripts) if x == symbol))
+                        sum(gradient.strides[ind] for ind in (n for n, i in enumerate(operand_original_subscripts) if i == symbol))
                         for symbol in gradient_subscripts
                     )
 
