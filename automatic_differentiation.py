@@ -655,17 +655,27 @@ class Node(Variable):
             optimize='optimal',
             **params: Any
     ) -> Node:
+        # Ensure that all operands are instances of the Variable class:
         operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
+
+        # Remove whitespace from subscripts:
         subscripts = re.sub(r'\s+', '', subscripts)
+
+        # Split subscripts into input and output parts:
         in_out_subscripts = subscripts.split('->')
         in_subscripts = in_out_subscripts[0].split(',')
+
+        # Check the validity of the einsum subscripts:
         assert 1 <= len(in_out_subscripts) <= 2, f"Invalid einsum subscripts: {subscripts}"
         assert len(in_subscripts) == len(operands), \
             f"Number of input operands doesn't match input subscripts {in_subscripts} with {len(operands)} operands provided: {subscripts}."
 
+        # Create a string representation of operands for naming purposes:
         operands_str = ", ".join(str(operand) for operand in operands)
         name = f"einsum(subscripts='{subscripts}', {operands_str})"
         operation = "einsum"
+
+        # This allows the subscripts to be passed to the Node constructor:
         params['subscripts'] = subscripts
 
         def value_fn() -> np.ndarray:
@@ -675,6 +685,8 @@ class Node(Variable):
             # This solution is based on the code from MyGrad:
             # source: https://github.com/rsokl/MyGrad/blob/133072b526966e235d70bbfcf9eb86d43d0fcfa1/src/mygrad/linalg/ops.py
 
+            # Parse and uniformize the subscripts and their corresponding operands before evaluating the gradients:
+            # (This is done using opt_einsum parser. This remove the need to deal with ellipsis (...) and exceptions.)
             operands_list = [operand.value_fn() for operand in operands]
             in_subscripts, out_subscripts, raw_operands = parser.parse_einsum_input((subscripts, *operands_list))
             raw_operands = tuple(raw_operands)
@@ -684,52 +696,72 @@ class Node(Variable):
             shapes = [op.shape for op in raw_operands]
             symbol_to_dim = {symbol: dim for symbols, dims in zip(in_subscripts, shapes) for symbol, dim in zip(symbols, dims)}
 
+            # Iterate over the operands in order to evaluate the gradient with respect to them:
             gradients = ()
             for operand_index, operand in enumerate(operands):
 
+                # Make a copy in order to keep the original unmodified:
                 backpropagation_copy = backpropagation.copy()
                 in_subscripts_copy = in_subscripts.copy()
 
+                # Get the operand original subscripts and the subscripts without repeated symbols (i.e. 'iji' becomes 'ji'):
                 operand_original_subscripts = in_subscripts_copy.pop(operand_index)
                 gradient_subscripts = reduce(lambda acc, x: acc + x if x not in acc else acc, operand_original_subscripts[::-1], "")[::-1]
 
+                # Check if a symbol is repeated in the operand original subscripts:
                 a_symbol_is_repeated = len(gradient_subscripts) != len(operand_original_subscripts)
 
+                # Evaluate the shape of the operand without any repeated symbol:
                 operand_shape = tuple(symbol_to_dim[label] for label in gradient_subscripts) if a_symbol_is_repeated else operand.shape
 
+                # Initialize the backpropagation subscripts used to evaluate the gradient w.r.t. the operand:
                 backpropagation_subscripts = out_subscripts
-                unique_in_subscripts = set(chain.from_iterable(in_subscripts_copy)) | set(backpropagation_subscripts)
 
-                if len(set(gradient_subscripts) - unique_in_subscripts) > 0:
+                # Build a set composed of the symbols appearing on the left side of the arrow:
+                unique_in_symbols = set(chain.from_iterable(in_subscripts_copy)) | set(backpropagation_subscripts)
+
+                # If the right side of the subscripts contains a symbol that isn't on the left side,
+                # expand the backpropagation and add the symbol to the left side at the proper position:
+                if len(set(gradient_subscripts) - unique_in_symbols) > 0:
                     expanded_dims = [slice(None) for i in range(backpropagation_copy.ndim)]
                     backpropagation_shape = list(backpropagation_copy.shape)
-                    for n, label in enumerate(gradient_subscripts):
-                        if label not in unique_in_subscripts:
-                            backpropagation_subscripts = backpropagation_subscripts[:n] + label + backpropagation_subscripts[n:]
+                    for n, symbol in enumerate(gradient_subscripts):
+                        if symbol not in unique_in_symbols:
+                            backpropagation_subscripts = backpropagation_subscripts[:n] + symbol + backpropagation_subscripts[n:]
                             expanded_dims.insert(n, np.newaxis)
                             backpropagation_shape.insert(n, operand_shape[n])
-
                     backpropagation_copy = np.broadcast_to(
                         backpropagation_copy if not backpropagation_copy.ndim else backpropagation_copy[tuple(expanded_dims)],
                         backpropagation_shape
                     )
 
+                # Build the subscripts and sequence of operands used to evaluate the gradient w.r.t the operand:
                 backpropagation_subscripts = ",".join([backpropagation_subscripts] + in_subscripts_copy) + "->" + gradient_subscripts
                 out_operands = (backpropagation_copy,) + raw_operands[:operand_index] + raw_operands[operand_index + 1:]
 
+                # If a symbol is repeated, create a view into the gradient array to map the evaluated values adequately:
                 if a_symbol_is_repeated:
                     gradient = np.zeros(tuple(symbol_to_dim[i] for i in operand_original_subscripts))
                     out_view_shape = tuple(symbol_to_dim[i] for i in gradient_subscripts)
 
+                    # Calculate the strides to map the data correctly in the view:
                     strides = tuple(
-                        sum(gradient.strides[ind] for ind in (n for n, x in enumerate(operand_original_subscripts) if x == label))
-                        for label in gradient_subscripts
+                        sum(gradient.strides[ind] for ind in (n for n, x in enumerate(operand_original_subscripts) if x == symbol))
+                        for symbol in gradient_subscripts
                     )
+
+                    # Create a view into the gradient array:
                     out_view = np.lib.stride_tricks.as_strided(gradient, shape=out_view_shape, strides=strides)
+
+                    # Compute the gradient using the specified subscripts and operands, storing the result in the view:
                     contract(backpropagation_subscripts, *out_operands, out=out_view, optimize=optimize)
                 else:
                     output_shape = operand.shape
+
+                    # Compute the gradient using the specified subscripts and operands:
                     gradient = contract(backpropagation_subscripts, *out_operands, optimize=optimize)
+
+                    # Check if the gradient shape matches the output shape:
                     if gradient.shape != output_shape:
                         if gradient.ndim != len(output_shape):
                             if gradient.ndim < len(output_shape):
@@ -739,12 +771,16 @@ class Node(Variable):
                                 )
                             gradient = gradient.sum(axis=tuple(range(gradient.ndim - len(output_shape))))
 
+                        # Sum over dimensions to match the output shape if necessary:
                         keepdims = tuple(n for n, i in enumerate(gradient.shape) if i != output_shape[n])
                         if keepdims:
                             gradient = gradient.sum(axis=keepdims, keepdims=True)
+
+                    # Broadcast the gradient to match the operand shape if necessary:
                     if operand_shape != gradient.shape:
                         gradient = np.broadcast_to(gradient, operand_shape)
 
+                # Append the gradient and associated operand to the gradients tuple:
                 gradients += ((operand, gradient),)
 
             return gradients
