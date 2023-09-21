@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from itertools import chain
 from functools import reduce, partial
 from typing import Any, List, Optional, Set, SupportsFloat, Callable, Tuple, Dict
 
@@ -656,9 +657,9 @@ class Node(Variable):
     ) -> Node:
         operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
         subscripts = re.sub(r'\s+', '', subscripts)
-        in_ou_subscripts = subscripts.split('->')
-        in_subscripts = in_ou_subscripts[0].split(',')
-        assert 1 <= len(in_ou_subscripts) <= 2, f"Invalid einsum subscripts: {subscripts}"
+        in_out_subscripts = subscripts.split('->')
+        in_subscripts = in_out_subscripts[0].split(',')
+        assert 1 <= len(in_out_subscripts) <= 2, f"Invalid einsum subscripts: {subscripts}"
         assert len(in_subscripts) == len(operands), \
             f"Number of input operands doesn't match input subscripts {in_subscripts} with {len(operands)} operands provided: {subscripts}."
 
@@ -670,55 +671,81 @@ class Node(Variable):
         def value_fn() -> np.ndarray:
             return contract(subscripts, *(operand.value_fn() for operand in operands), optimize=optimize)
 
-        def gradient_fn(backpropagation) -> Tuple[Tuple[Variable, np.ndarray], ...]:
+        def gradient_fn(backpropagation):
+            # This solution is based on the code from MyGrad:
+            # source: https://github.com/rsokl/MyGrad/blob/133072b526966e235d70bbfcf9eb86d43d0fcfa1/src/mygrad/linalg/ops.py
+
             operands_list = [operand.value_fn() for operand in operands]
-            parsed_einsum_input = parser.parse_einsum_input((subscripts, *operands_list))
-            in_out_subscripts_list = re.split(r',|->', "->".join(parsed_einsum_input[:2]))
+            in_subscripts, out_subscripts, raw_operands = parser.parse_einsum_input((subscripts, *operands_list))
+            raw_operands = tuple(raw_operands)
+            in_subscripts = in_subscripts.split(',')
 
             # Get the dimension associated with a symbol:
-            parsed_input = parsed_einsum_input[0].split(',')
-            shapes = [op.shape for op in parsed_einsum_input[2]]
-            symbol_to_dim = {symbol: dim for symbols, dims in zip(parsed_input, shapes) for symbol, dim in zip(symbols, dims)}
+            shapes = [op.shape for op in raw_operands]
+            symbol_to_dim = {symbol: dim for symbols, dims in zip(in_subscripts, shapes) for symbol, dim in zip(symbols, dims)}
 
             gradients = ()
             for operand_index, operand in enumerate(operands):
 
-                in_out_subscripts_list_ = in_out_subscripts_list[:]
-                original_var_label = in_out_subscripts_list_[operand_index]
-                var_label = reduce(lambda acc, x: acc + x if x not in acc else acc, original_var_label[::-1], "")[::-1]
-                in_out_subscripts_list_[operand_index] = var_label
+                backpropagation_copy = backpropagation.copy()
+                in_subscripts_copy = in_subscripts.copy()
 
-                # Define the order of operands and subscripts to correctly perform the einsum:
-                order = list(range(len(in_out_subscripts_list_)))
-                order[operand_index], order[-1] = order[-1], order[operand_index]
+                operand_original_subscripts = in_subscripts_copy.pop(operand_index)
+                gradient_subscripts = reduce(lambda acc, x: acc + x if x not in acc else acc, operand_original_subscripts[::-1], "")[::-1]
 
-                # Reorder the operands and subscripts according to the computed order:
-                operands_list = [operand.value for operand in operands] + [backpropagation]
-                operands_list = [operands_list[i] for i in order]
-                subscripts_list = [in_out_subscripts_list_[i] for i in order]
+                a_symbol_is_repeated = len(gradient_subscripts) != len(operand_original_subscripts)
 
-                # Handles the cases where there is a reduction:
-                for i, letter in enumerate(in_out_subscripts_list_[operand_index]):
-                    if letter not in "".join(subscripts_list[:-1]):
-                        subscripts_list.insert(0, letter)
-                        dim = operand.shape[i]
-                        operands_list.insert(0, np.ones(dim))
+                operand_shape = tuple(symbol_to_dim[label] for label in gradient_subscripts) if a_symbol_is_repeated else operand.shape
 
-                # Construct the subscripts string for the new einsum operation:
-                grad_subscripts = ",".join(subscripts_list[:-1]) + "->" + subscripts_list[-1]
+                backpropagation_subscripts = out_subscripts
+                unique_in_subscripts = set(chain.from_iterable(in_subscripts_copy)) | set(backpropagation_subscripts)
 
-                if len(original_var_label) != len(var_label):
-                    gradient = np.zeros(tuple(symbol_to_dim[i] for i in original_var_label))
-                    out_view_shape = tuple(symbol_to_dim[i] for i in var_label)
+                if len(set(gradient_subscripts) - unique_in_subscripts) > 0:
+                    expanded_dims = [slice(None) for i in range(backpropagation_copy.ndim)]
+                    backpropagation_shape = list(backpropagation_copy.shape)
+                    for n, label in enumerate(gradient_subscripts):
+                        if label not in unique_in_subscripts:
+                            backpropagation_subscripts = backpropagation_subscripts[:n] + label + backpropagation_subscripts[n:]
+                            expanded_dims.insert(n, np.newaxis)
+                            backpropagation_shape.insert(n, operand_shape[n])
+
+                    backpropagation_copy = np.broadcast_to(
+                        backpropagation_copy if not backpropagation_copy.ndim else backpropagation_copy[tuple(expanded_dims)],
+                        backpropagation_shape
+                    )
+
+                backpropagation_subscripts = ",".join([backpropagation_subscripts] + in_subscripts_copy) + "->" + gradient_subscripts
+                out_operands = (backpropagation_copy,) + raw_operands[:operand_index] + raw_operands[operand_index + 1:]
+
+                if a_symbol_is_repeated:
+                    gradient = np.zeros(tuple(symbol_to_dim[i] for i in operand_original_subscripts))
+                    out_view_shape = tuple(symbol_to_dim[i] for i in gradient_subscripts)
+
                     strides = tuple(
-                        sum(gradient.strides[ind] for ind in (n for n, x in enumerate(original_var_label) if x == label)) for label in var_label
+                        sum(gradient.strides[ind] for ind in (n for n, x in enumerate(operand_original_subscripts) if x == label))
+                        for label in gradient_subscripts
                     )
                     out_view = np.lib.stride_tricks.as_strided(gradient, shape=out_view_shape, strides=strides)
-                    contract(grad_subscripts, *operands_list[:-1], out=out_view, optimize=optimize)
+                    contract(backpropagation_subscripts, *out_operands, out=out_view, optimize=optimize)
                 else:
-                    gradient = contract(grad_subscripts, *operands_list[:-1], optimize=optimize)
+                    output_shape = operand.shape
+                    gradient = contract(backpropagation_subscripts, *out_operands, optimize=optimize)
+                    if gradient.shape != output_shape:
+                        if gradient.ndim != len(output_shape):
+                            if gradient.ndim < len(output_shape):
+                                raise ValueError(
+                                    f"The dimensionality of the gradient of the broadcasted operation ({gradient.ndim})"
+                                    f" is less than that of its associated variable ({len(output_shape)})"
+                                )
+                            gradient = gradient.sum(axis=tuple(range(gradient.ndim - len(output_shape))))
 
-                gradients += ((operand, gradient), )
+                        keepdims = tuple(n for n, i in enumerate(gradient.shape) if i != output_shape[n])
+                        if keepdims:
+                            gradient = gradient.sum(axis=keepdims, keepdims=True)
+                    if operand_shape != gradient.shape:
+                        gradient = np.broadcast_to(gradient, operand_shape)
+
+                gradients += ((operand, gradient),)
 
             return gradients
 
@@ -843,4 +870,4 @@ if __name__ == "__main__":
     grads = formula.grads
     print(f"df(A, B, C)/dA = \n{grads[A]}")                        # Gradient with respect to A
     print(f"df(A, B, C)/dB = \n{grads[B]}")                        # Gradient with respect to B
-    print(f"df(A, B, C)/dB = \n{grads[C]}")                        # Gradient with respect to C
+    print(f"df(A, B, C)/dC = \n{grads[C]}")                        # Gradient with respect to C

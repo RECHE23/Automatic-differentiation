@@ -905,16 +905,22 @@ class TestNumpyArrayOperations(unittest.TestCase):
         y = Variable('y')
         formula = x @ y
 
-        x_val = np.arange(3**3).reshape((3, 3, 3))
-        y_val = np.arange(3**3).reshape((3, 3, 3))
+        x_val = np.arange(3 ** 3).reshape((3, 3, 3))
+        y_val = np.arange(3 ** 3).reshape((3, 3, 3))
 
         result = formula.evaluate_at(x=x_val, y=y_val)
-        expected_result = np.array([[[ 15.0, 18.0, 21.0], [ 42.0, 54.0, 66.0], [ 69.0, 90.0, 111.0]], [[ 366.0, 396.0, 426.0], [ 474.0, 513.0, 552.0], [ 582.0, 630.0, 678.0]], [[1203.0, 1260.0, 1317.0], [1392.0, 1458.0, 1524.0], [1581.0, 1656.0, 1731.0]]])
+        expected_result = np.array(
+            [[[15.0, 18.0, 21.0], [42.0, 54.0, 66.0], [69.0, 90.0, 111.0]], [[366.0, 396.0, 426.0], [474.0, 513.0, 552.0], [582.0, 630.0, 678.0]],
+             [[1203.0, 1260.0, 1317.0], [1392.0, 1458.0, 1524.0], [1581.0, 1656.0, 1731.0]]])
         np.testing.assert_array_almost_equal(result, expected_result)
 
         grads = formula.grads
-        expected_grad_x = np.array([[[ 3.0, 12.0, 21.0], [ 3.0, 12.0, 21.0], [ 3.0, 12.0, 21.0]], [[30.0, 39.0, 48.0], [30.0, 39.0, 48.0], [30.0, 39.0, 48.0]], [[57.0, 66.0, 75.0], [57.0, 66.0, 75.0], [57.0, 66.0, 75.0]]])
-        expected_grad_y = np.array([[[ 9.0, 9.0, 9.0], [12.0, 12.0, 12.0], [15.0, 15.0, 15.0]], [[36.0, 36.0, 36.0], [39.0, 39.0, 39.0], [42.0, 42.0, 42.0]], [[63.0, 63.0, 63.0], [66.0, 66.0, 66.0], [69.0, 69.0, 69.0]]])
+        expected_grad_x = np.array(
+            [[[3.0, 12.0, 21.0], [3.0, 12.0, 21.0], [3.0, 12.0, 21.0]], [[30.0, 39.0, 48.0], [30.0, 39.0, 48.0], [30.0, 39.0, 48.0]],
+             [[57.0, 66.0, 75.0], [57.0, 66.0, 75.0], [57.0, 66.0, 75.0]]])
+        expected_grad_y = np.array(
+            [[[9.0, 9.0, 9.0], [12.0, 12.0, 12.0], [15.0, 15.0, 15.0]], [[36.0, 36.0, 36.0], [39.0, 39.0, 39.0], [42.0, 42.0, 42.0]],
+             [[63.0, 63.0, 63.0], [66.0, 66.0, 66.0], [69.0, 69.0, 69.0]]])
         np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
         np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
 
@@ -923,16 +929,22 @@ class TestNumpyArrayOperations(unittest.TestCase):
         y = Variable('y')
         formula = transpose(x, axes=(1, 0, 2)) @ y
 
-        x_val = np.arange(3**3).reshape((3, 3, 3))
-        y_val = np.arange(3**3).reshape((3, 3, 3))
+        x_val = np.arange(3 ** 3).reshape((3, 3, 3))
+        y_val = np.arange(3 ** 3).reshape((3, 3, 3))
 
         result = formula.evaluate_at(x=x_val, y=y_val)
-        expected_result = np.array([[[ 15.0, 18.0, 21.0], [ 96.0, 126.0, 156.0], [ 177.0, 234.0, 291.0]], [[ 150.0, 162.0, 174.0], [ 474.0, 513.0, 552.0], [ 798.0, 864.0, 930.0]], [[ 447.0, 468.0, 489.0], [1014.0, 1062.0, 1110.0], [1581.0, 1656.0, 1731.0]]])
+        expected_result = np.array(
+            [[[15.0, 18.0, 21.0], [96.0, 126.0, 156.0], [177.0, 234.0, 291.0]], [[150.0, 162.0, 174.0], [474.0, 513.0, 552.0], [798.0, 864.0, 930.0]],
+             [[447.0, 468.0, 489.0], [1014.0, 1062.0, 1110.0], [1581.0, 1656.0, 1731.0]]])
         np.testing.assert_array_almost_equal(result, expected_result)
 
         grads = formula.grads
-        expected_grad_x = np.array([[[ 3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]], [[ 3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]], [[ 3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]]])
-        expected_grad_y = np.array([[[27.0, 27.0, 27.0], [30.0, 30.0, 30.0], [33.0, 33.0, 33.0]], [[36.0, 36.0, 36.0], [39.0, 39.0, 39.0], [42.0, 42.0, 42.0]], [[45.0, 45.0, 45.0], [48.0, 48.0, 48.0], [51.0, 51.0, 51.0]]])
+        expected_grad_x = np.array(
+            [[[3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]], [[3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]],
+             [[3.0, 12.0, 21.0], [30.0, 39.0, 48.0], [57.0, 66.0, 75.0]]])
+        expected_grad_y = np.array(
+            [[[27.0, 27.0, 27.0], [30.0, 30.0, 30.0], [33.0, 33.0, 33.0]], [[36.0, 36.0, 36.0], [39.0, 39.0, 39.0], [42.0, 42.0, 42.0]],
+             [[45.0, 45.0, 45.0], [48.0, 48.0, 48.0], [51.0, 51.0, 51.0]]])
         np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
         np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
 
@@ -1038,7 +1050,9 @@ class TestNumpyArrayOperations(unittest.TestCase):
         np.testing.assert_array_almost_equal(result, expected_result)
 
         grads = formula.grads
-        expected_grad_x = np.array([[[2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0]], [[0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0]], [[0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0]]])
+        expected_grad_x = np.array([[[2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+                                    [[0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0], [0.0, 2.0, 0.0]],
+                                    [[0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0], [0.0, 0.0, 2.0]]])
         expected_grad_y = np.array([[4.0, 4.0, 4.0], [4.0, 4.0, 4.0]])
         expected_grad_z = np.array([[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]])
         np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
@@ -1288,7 +1302,8 @@ class TestNumpyArrayOperations(unittest.TestCase):
         z_val = np.array([[[1.0, 3.0], [2.0, 2.0]], [[0.0, 1.0], [1.0, 0.0]]])
 
         result = formula.evaluate_at(x=x_val, y=y_val, z=z_val)
-        expected_result = np.array([[[[[2.0, 6.0], [1.0, 3.0]], [[4.0, 12.0], [2.0, 6.0]]], [[[0.0, 0.0], [12.0, 12.0]], [[0.0, 0.0], [16.0, 16.0]]]], [[[[0.0, 5.0], [0.0, 10.0]], [[0.0, 6.0], [0.0, 12.0]]], [[[14.0, 0.0], [7.0, 0.0]], [[16.0, 0.0], [8.0, 0.0]]]]])
+        expected_result = np.array([[[[[2.0, 6.0], [1.0, 3.0]], [[4.0, 12.0], [2.0, 6.0]]], [[[0.0, 0.0], [12.0, 12.0]], [[0.0, 0.0], [16.0, 16.0]]]],
+                                    [[[[0.0, 5.0], [0.0, 10.0]], [[0.0, 6.0], [0.0, 12.0]]], [[[14.0, 0.0], [7.0, 0.0]], [[16.0, 0.0], [8.0, 0.0]]]]])
         np.testing.assert_array_almost_equal(result, expected_result)
 
         grads = formula.grads
@@ -1315,16 +1330,15 @@ class TestNumpyArrayOperations(unittest.TestCase):
         expected_result = np.array([[[[24.0], [72.0]], [[92.0], [116.0]]], [[[32.0], [96.0]], [[112.0], [144.0]]]])
         np.testing.assert_array_almost_equal(result, expected_result)
 
-        # TODO: Solve this problem... (Tensorflow can't even process this! Is PyTorch's result wrong?)
-        # grads = formula.grads
-        # expected_grad_x = np.array([[[[24.0, 24.0], [16.0, 16.0]], [[24.0, 24.0], [16.0, 16.0]]]])
-        # expected_grad_y = np.array([[112.0, 112.0], [176.0, 176.0]])
-        # expected_grad_z = np.array([[[84.0, 84.0], [88.0, 88.0]]])
-        # expected_grad_w = np.array([[344.0]])
-        # np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
-        # np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
-        # np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
-        # np.testing.assert_array_almost_equal(grads[w], expected_grad_w)
+        grads = formula.grads
+        expected_grad_x = np.array([[[[24.0, 24.0], [16.0, 16.0]], [[24.0, 24.0], [16.0, 16.0]]]])
+        expected_grad_y = np.array([[112.0, 112.0], [176.0, 176.0]])
+        expected_grad_z = np.array([[[84.0, 84.0], [88.0, 88.0]]])
+        expected_grad_w = np.array([[344.0]])
+        np.testing.assert_array_almost_equal(grads[x], expected_grad_x)
+        np.testing.assert_array_almost_equal(grads[y], expected_grad_y)
+        np.testing.assert_array_almost_equal(grads[z], expected_grad_z)
+        np.testing.assert_array_almost_equal(grads[w], expected_grad_w)
 
 
 if __name__ == '__main__':
