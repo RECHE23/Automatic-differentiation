@@ -185,18 +185,17 @@ class Variable:
         self._modified = False
 
     def __repr__(self) -> str:
-        if not isinstance(self, Node):
-            value_txt = f"ndarray{self.value.shape}" if self.value.shape != () else self.value
+        if all(np.any(v.value) is not None for v in self.variables):
+            value_txt = f"ndarray⟨size={self.value.shape}, dtype={self.value.dtype}⟩" if self.value.shape != () else self.value
             value_txt = "" if np.any(self.value) is None else f", value={value_txt}"
         else:
-            # TODO: Display the value of a node?
             value_txt = ""
-        name_value_text = f"{self.__class__.__name__}(name='{self.name}'{value_txt}"
+        name_text = f"{self.__class__.__name__}(name='{self.name}'"
         if isinstance(self, Node):
             operands = [f"{n.name}" if isinstance(n, Constant) else f"'{n.name}'" for n in self.operands] or ", "
             operands_txt = ", ".join(operands)
-            return f"{name_value_text}, operation='{self.operation}', operands=({operands_txt}))"
-        return f"{name_value_text})"
+            return f"{name_text}, operation='{self.operation}', operands=({operands_txt}){value_txt})"
+        return f"{name_text}{value_txt})"
 
     def __str__(self) -> str:
         return self.name
@@ -218,10 +217,10 @@ class Variable:
     @property
     def graph(self) -> str:
         return f"digraph {{\n" \
-               f"  ordering=out\n" \
-               f"  fontsize=15\n" \
-               f"  labelloc=\"t\"\n" \
-               f"  label=\"Computational graph\"\n" \
+               f"  ordering=out;\n" \
+               f"  fontsize=15;\n" \
+               f"  labelloc=t;\n" \
+               f"  label=\"Computational graph\";\n" \
                f"{self._graph}}}"
 
     @property
