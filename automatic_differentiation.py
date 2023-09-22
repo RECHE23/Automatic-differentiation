@@ -453,7 +453,7 @@ class Constant(Variable):
         if name is None:
             if isinstance(value, np.ndarray):
                 name = value.__class__.__name__
-                name += str(value.shape)
+                name += str(value.shape).replace('(', '⟨').replace(')', '⟩').replace(', ', '×')
             else:
                 name = str(value)
         super().__init__(name, value)
