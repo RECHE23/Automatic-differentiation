@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import re
 from itertools import chain
+from collections import OrderedDict
 from functools import reduce, partial
 from typing import Any, Optional, Set, SupportsFloat, Callable, Tuple, Dict
 
@@ -176,13 +177,14 @@ class Variable:
     def __init__(self, name: str, value: float | np.ndarray = None,
                  value_fn: Callable[[], np.ndarray] = None,
                  gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]] = None):
-        self.variables = {self}
         self.name = name
         self.value = value
         self.value_fn = value_fn if value_fn is not None else lambda: self.value
         self.gradient_fn = gradient_fn if gradient_fn is not None else lambda backpropagation: []
         self.id = f"var_{id(self):x}"
         self._modified = False
+        self.parents = dict()
+        self.variables = {self}
 
     def __repr__(self) -> str:
         if all(np.any(v.value) is not None for v in self.variables):
@@ -216,12 +218,13 @@ class Variable:
 
     @property
     def graph(self) -> str:
+        graph = '\n'.join(OrderedDict.fromkeys(self._graph.split('\n')))
         return f"digraph {{\n" \
                f"  ordering=out;\n" \
                f"  fontsize=15;\n" \
                f"  labelloc=t;\n" \
                f"  label=\"Computational graph\";\n" \
-               f"{self._graph}}}"
+               f"{graph}}}"
 
     @property
     def shape(self) -> Tuple[int, ...]:
@@ -295,6 +298,20 @@ class Variable:
 
     def __len__(self) -> int:
         return len(self.value)
+
+    def __hash__(self):
+        if isinstance(self, Constant):
+            return hash((self.name, str(self.value.data)))
+        elif isinstance(self, Node):
+            return hash((self.name, self.operation, self.operands))
+        else:
+            return hash((self.name, id(self)))
+
+    def __eq__(self, other):
+        if isinstance(other, Variable):
+            return hash(self) == hash(other)
+        else:
+            return self.value == other
 
     def __add__(self, other: Variable | np.ndarray | SupportsFloat) -> Node:
         return Node.binary_operation(self, other, 'add')
@@ -486,9 +503,9 @@ class Node(Variable):
             gradient_fn: Callable[[float | np.ndarray], Tuple[Tuple[Variable, np.ndarray], ...]] = lambda: [],
             **params: Any
     ):
-        super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.operation = operation
         self.operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
+        super().__init__(name=name, value_fn=value_fn, gradient_fn=gradient_fn)
         self.variables = set.union(*[operand.variables for operand in self.operands])
         self.params = params
         self._shape = None
@@ -600,6 +617,10 @@ class Node(Variable):
         item = Variable._ensure_is_a_variable(item)
         operands = (item,)
 
+        key = (operation, operands)
+        if key in item.parents:
+            return item.parents[key]
+
         if operation in OPERATIONS['repr']:
             item_name = Node._apply_parenthesis_if_needed(item, operation)
             name = OPERATIONS['repr'][operation](item_name)
@@ -613,7 +634,9 @@ class Node(Variable):
             grad = OPERATIONS['unary'][operation][1](item, backpropagation, **params)
             return (item, grad),
 
-        return Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
+        node = Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
+        item.parents[key] = node
+        return node
 
     @staticmethod
     def binary_operation(
@@ -654,6 +677,12 @@ class Node(Variable):
         right = Variable._ensure_is_a_variable(right)
         operands = (left, right)
 
+        key = (operation, operands)
+        if key in left.parents:
+            return left.parents[key]
+        if key in right.parents:
+            return right.parents[key]
+
         if operation in OPERATIONS['repr']:
             left_name = Node._apply_parenthesis_if_needed(left, operation)
             right_name = Node._apply_parenthesis_if_needed(right, operation, right=True)
@@ -668,7 +697,10 @@ class Node(Variable):
             grad_left, grad_right = OPERATIONS['binary'][operation][1](left, right, backpropagation, **params)
             return (left, grad_left), (right, grad_right)
 
-        return Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
+        node = Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
+        left.parents[key] = node
+        right.parents[key] = node
+        return node
 
     @staticmethod
     def einsum(
@@ -679,9 +711,15 @@ class Node(Variable):
     ) -> Node:
         # Ensure that all operands are instances of the Variable class:
         operands = tuple(Variable._ensure_is_a_variable(operand) for operand in operands)
+        operation = "einsum"
 
         # Remove whitespace from subscripts:
         subscripts = re.sub(r'\s+', '', subscripts)
+
+        key = (operation, subscripts, operands)
+        for operand in operands:
+            if key in operand.parents:
+                return operand.parents[key]
 
         # Split subscripts into input and output parts:
         in_out_subscripts = subscripts.split('->')
@@ -695,7 +733,6 @@ class Node(Variable):
         # Create a string representation of operands for naming purposes:
         operands_str = ", ".join(str(operand) for operand in operands)
         name = f"einsum(subscripts='{subscripts}', {operands_str})"
-        operation = "einsum"
 
         # This allows the subscripts to be passed to the Node constructor:
         params['subscripts'] = subscripts
@@ -807,7 +844,12 @@ class Node(Variable):
 
             return gradients
 
-        return Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
+        node = Node(name=name, operation=operation, operands=operands, value_fn=value_fn, gradient_fn=gradient_fn, **params)
+
+        for operand in operands:
+            operand.parents[key] = node
+
+        return node
 
 
 def einsum(subscripts: str, *operands: Variable, optimize='optimal', **params) -> Node:
@@ -894,7 +936,7 @@ for key in OPERATIONS['binary'].keys():
 # A list of all the symbols in this module:
 __all__ = ['erf', 'neg', 'erfc', 'sinh', 'asin', 'log10', 'log', 'atan', 'sin', 'asinh', 'acos', 'cos',
            'sqrt', 'acosh', 'abs', 'tan', 'cosh', 'tanh', 'exp', 'cbrt', 'atanh', 'einsum', 'transpose',
-           'Variable', 'set_variables']
+           'Variable', 'Constant', 'set_variables']
 
 
 # Example usage:

@@ -43,6 +43,12 @@ class TestVariable(unittest.TestCase):
         with np.testing.assert_raises(TypeError):
             one.at = 2
 
+        alpha = Constant(1)
+        beta = Constant(1)
+        gamma = Constant(2)
+        self.assertEqual(alpha, beta)
+        self.assertNotEqual(beta, gamma)
+
     def test_variable_evaluate(self):
         x = Variable('x')
         self.assertEqual(x.evaluate_at(x=5), 5)
