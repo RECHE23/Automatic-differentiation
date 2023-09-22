@@ -4,7 +4,7 @@ import math
 import re
 from itertools import chain
 from functools import reduce, partial
-from typing import Any, List, Optional, Set, SupportsFloat, Callable, Tuple, Dict
+from typing import Any, Optional, Set, SupportsFloat, Callable, Tuple, Dict
 
 import numpy as np
 from opt_einsum import contract, parser
@@ -186,7 +186,7 @@ class Variable:
 
     def __repr__(self) -> str:
         if all(np.any(v.value) is not None for v in self.variables):
-            value_txt = f"ndarray⟨size={self.value.shape}, dtype={self.value.dtype}⟩" if self.value.shape != () else self.value
+            value_txt = f"ndarray⟨size={self.value.shape}, dtype={self.value.dtype}⟩" if self.value.ndim > 1 else self.value.squeeze()
             value_txt = "" if np.any(self.value) is None else f", value={value_txt}"
         else:
             value_txt = ""
@@ -260,24 +260,31 @@ class Variable:
         return {var: var.value for var in self.variables}
 
     @at.setter
-    def at(self, variable_assignments: Dict[Variable | str, float | np.ndarray]) -> None:
+    def at(self, variable_assignments: SupportsFloat | np.ndarray | Dict[Variable | str, float | np.ndarray]) -> None:
         if variable_assignments is not None:
-            if all(isinstance(k, Variable) for k in variable_assignments.keys()):
-                # The dictionary is of type Dict[Variable, float | np.ndarray]:
-                assert all(v.name in variable_assignments for v in self.variables)
+            if isinstance(self, Constant):
+                # Philosophical question: should we allow a Constant to change value? TBD...
+                raise TypeError("You are trying to change the value of a constant!")
+            if not isinstance(self, Node) and len(self.variables) == 1 and not isinstance(variable_assignments, dict):
+                # It is a Variable, which is being assigned a numerical value:
+                self.value = variable_assignments
             else:
-                # The dictionary is of type Dict[str, float | np.ndarray]:
-                assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
-                variable_assignments = {v: variable_assignments[v.name] for v in self.variables}
+                if all(isinstance(k, Variable) for k in variable_assignments.keys()):
+                    # The dictionary is of type Dict[Variable, float | np.ndarray]:
+                    assert all(v.name in variable_assignments for v in self.variables)
+                else:
+                    # The dictionary is of type Dict[str, float | np.ndarray]:
+                    assert len(set(variable_assignments.keys()).difference(set(v.name for v in self.variables))) == 0
+                    variable_assignments = {v: variable_assignments[v.name] for v in self.variables}
 
-            for k, v in variable_assignments.items():
-                if (k.value != v).any():
-                    if np.any(k.value) is not None:
-                        k._modified = True
-                    k.value = v
+                for k, v in variable_assignments.items():
+                    if (k.value != v).any():
+                        if np.any(k.value) is not None:
+                            k._modified = True
+                        k.value = v
         if isinstance(self, Node):
             self._update_shape()
-            self._value = None
+            self.value = None
 
     def __array__(self):
         return self.value
@@ -331,7 +338,7 @@ class Variable:
     def __abs__(self) -> Node:
         return Node.unary_operation(self, "abs")
 
-    def evaluate_at(self, **variable_assignments: float | np.ndarray) -> np.ndarray:
+    def evaluate_at(self, *args: float | np.ndarray, **variable_assignments: float | np.ndarray) -> np.ndarray:
         """
         Evaluate the value of the variable with specific variable assignments.
 
@@ -358,10 +365,13 @@ class Variable:
         >>> result = formula.evaluate_at(x=2, y=3, z=4)
         >>> print(result)
         """
-        self.at = variable_assignments
+        if len(self.variables) == 1 and args:
+            self.at = {list(self.variables)[0].name: args}
+        else:
+            self.at = variable_assignments
         return self.value
 
-    def evaluate_gradients_at(self, **variable_assignments: float | np.ndarray) -> Dict[Variable, np.ndarray]:
+    def evaluate_gradients_at(self, *args: float | np.ndarray, **variable_assignments: float | np.ndarray) -> Dict[Variable, np.ndarray]:
         """
         Evaluate the gradients of the variable with specific variable assignments.
 
@@ -388,7 +398,10 @@ class Variable:
         >>> gradients = formula.evaluate_gradients_at(x=2, y=3, z=4)
         >>> print(gradients[x])
         """
-        self.at = variable_assignments
+        if len(self.variables) == 1 and args:
+            self.at = {list(self.variables)[0].name: args}
+        else:
+            self.at = variable_assignments
         return self.compute_gradients()
 
     def compute_gradients(self, backpropagation: float | np.ndarray = None) -> Dict[Variable, np.ndarray]:
@@ -493,7 +506,7 @@ class Node(Variable):
 
     @property
     def size(self) -> int:
-        return np.prod(self.shape)
+        return int(np.prod(self.shape))
 
     @property
     def dtype(self) -> np.dtype:

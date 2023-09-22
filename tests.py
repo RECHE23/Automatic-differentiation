@@ -27,19 +27,34 @@ class TestVariable(unittest.TestCase):
         f = x + 1
         self.assertEqual(repr(f), "Node(name='x + 1', operation='add', operands=('x', 1))")
         self.assertEqual(str(f), 'x + 1')
+        x.at = 1
+        self.assertEqual(repr(f), "Node(name='x + 1', operation='add', operands=('x', 1), value=2)")
+        x.at = {'x': 2}
+        self.assertEqual(repr(f), "Node(name='x + 1', operation='add', operands=('x', 1), value=3)")
+        x.evaluate_at(x=3)
+        self.assertEqual(repr(f), "Node(name='x + 1', operation='add', operands=('x', 1), value=4)")
+        x.evaluate_at(4)
+        self.assertEqual(repr(f), "Node(name='x + 1', operation='add', operands=('x', 1), value=5)")
 
         one = f.operands[1]
         self.assertEqual(repr(one), "Constant(name='1', value=1)")
         self.assertEqual(str(one), '1')
 
+        with np.testing.assert_raises(TypeError):
+            one.at = 2
+
     def test_variable_evaluate(self):
         x = Variable('x')
         self.assertEqual(x.evaluate_at(x=5), 5)
+        x.at = 6
+        self.assertEqual(x.value, 6)
 
     def test_variable_compute_gradients(self):
         x = Variable('x')
         x.value = 5
         grads = x.compute_gradients()
+        self.assertEqual(grads[x], 1.0)
+        grads = x.evaluate_gradients_at(6)
         self.assertEqual(grads[x], 1.0)
 
 
