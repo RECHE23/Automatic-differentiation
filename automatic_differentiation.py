@@ -19,9 +19,7 @@ OPERATIONS = {
         'neg': (np.negative, lambda item, grad: -np.ones_like(item.value) * grad),
         'abs': (np.abs, lambda item, grad: np.sign(item.value) * grad),
         'exp': (np.exp, lambda item, grad: np.exp(item.value) * grad),
-        # TODO: Handle the case where item.value == 0:
         'log': (np.log, lambda item, grad: 1.0 / item.value * grad),
-        # TODO: Handle the case where item.value == 0:
         'log10': (np.log10, lambda item, grad: 1.0 / (item.value * np.log(10.0)) * grad),
         'sin': (np.sin, lambda item, grad: np.cos(item.value) * grad),
         'asin': (np.arcsin, lambda item, grad: 1.0 / np.sqrt(1 - item.value ** 2) * grad),
@@ -35,9 +33,7 @@ OPERATIONS = {
         'acosh': (np.arccosh, lambda item, grad: 1.0 / np.sqrt(item.value ** 2.0 - 1.0) * grad),
         'tanh': (np.tanh, lambda item, grad: 1.0 / np.cosh(item.value) ** 2.0 * grad),
         'atanh': (np.arctanh, lambda item, grad: 1.0 / (1.0 - item.value ** 2.0) * grad),
-        # TODO: Handle the case where item.value <= 0:
         'sqrt': (np.sqrt, lambda item, grad: 0.5 / np.sqrt(item.value) * grad),
-        # TODO: Handle the case where item.value <= 0:
         'cbrt': (np.cbrt, lambda item, grad: 1.0 / (3.0 * item.value ** (2.0 / 3.0)) * grad),
         'erf': (np.vectorize(math.erf), lambda item, grad: 2.0 * np.exp(-item.value ** 2.0) / np.sqrt(np.pi) * grad),
         'erfc': (np.vectorize(math.erfc), lambda item, grad: -2.0 * np.exp(-item.value ** 2.0) / np.sqrt(np.pi) * grad),
@@ -51,12 +47,10 @@ OPERATIONS = {
                                                              -np.ones_like(right.value) * grad)),
         'multiply': (np.multiply, lambda left, right, grad: (right.value * grad,
                                                              left.value * grad)),
-        # TODO: Handle the case where right.value == 0:
         'divide': (np.divide, lambda left, right, grad: (1 / right.value * grad,
                                                          - left.value / right.value ** 2 * grad)),
         'matmul': (np.matmul, lambda left, right, grad: (np.matmul(grad, np.swapaxes(right.value.conj(), -1, -2)),
                                                          np.matmul(np.swapaxes(left.value.conj(), -1, -2), grad))),
-        # TODO: Handle the case where left.value <= 0:
         'power': (np.power, lambda left, right, grad: (grad * (right.value * np.power(left.value, (right.value - 1))).conj(),
                                                        grad * (np.power(left.value, right.value) * np.log(left.value)).conj()))
     },
@@ -747,13 +741,13 @@ class Node(Variable):
             # Parse and uniformize the subscripts and their corresponding operands before evaluating the gradients:
             # (This is done using opt_einsum parser. This remove the need to deal with ellipsis (...) and exceptions.)
             operands_list = [operand.value for operand in operands]
-            in_subscripts, out_subscripts, raw_operands = parser.parse_einsum_input((subscripts, *operands_list))
+            _in_subscripts, out_subscripts, raw_operands = parser.parse_einsum_input((subscripts, *operands_list))
             raw_operands = tuple(raw_operands)
-            in_subscripts = in_subscripts.split(',')
+            _in_subscripts = _in_subscripts.split(',')
 
             # Get the dimension associated with a symbol:
             shapes = [op.shape for op in raw_operands]
-            symbol_to_dim = {symbol: dim for symbols, dims in zip(in_subscripts, shapes) for symbol, dim in zip(symbols, dims)}
+            symbol_to_dim = {symbol: dim for symbols, dims in zip(_in_subscripts, shapes) for symbol, dim in zip(symbols, dims)}
 
             # Iterate over the operands in order to evaluate the gradient with respect to them:
             gradients = ()
@@ -761,7 +755,7 @@ class Node(Variable):
 
                 # Make a copy in order to keep the original unmodified:
                 backpropagation_copy = backpropagation.copy()
-                in_subscripts_copy = in_subscripts.copy()
+                in_subscripts_copy = _in_subscripts.copy()
 
                 # Get the operand original subscripts and the subscripts without repeated symbols (i.e. 'iji' becomes 'ji'):
                 operand_original_subscripts = in_subscripts_copy.pop(operand_index)
@@ -862,6 +856,8 @@ def einsum(subscripts: str, *operands: Variable, optimize='optimal', **params) -
         The einsum subscripts string.
     operands : Variable
         The operands used in the einsum operation.
+    optimize : str
+        The optimization used in the einsum operation, by default 'optimal'.
 
     Returns
     -------
