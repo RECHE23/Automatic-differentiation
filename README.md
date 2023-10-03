@@ -22,24 +22,28 @@ To explore and experiment with this framework, follow these steps:
 
 1. Clone this repository to your local machine:
 
-```bash
-git clone https://github.com/RECHE23/Automatic-differentiation.git
-```
+    ```bash
+    git clone https://github.com/RECHE23/Automatic-differentiation.git
+    ```
 
 2. Navigate to the project directory:
-```bash
-cd Automatic-differentiation
-```
+
+    ```bash
+    cd Automatic-differentiation
+    ```
 
 3. Set up a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows, use "venv\Scripts\activate".
-```
+
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use "venv\Scripts\activate".
+    ```
+
 4. Install the required packages:
-```
-pip install -r requirements.txt
-```
+
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 ## Features
 
